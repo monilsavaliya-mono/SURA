@@ -1,0 +1,32 @@
+Initialize: θ₁=0, θ₂=1  (actor: linear policy)
+            w₁=0, w₂=20  (critic: linear value function)
+            α_θ = 0.001, α_w = 0.01, γ = 0.97, σ = 0.3
+
+Repeat for many episodes:
+
+  s = starting nA (random 1 to N-1)
+
+  Repeat until absorbed:
+
+    ① ACTOR chooses action:
+       μ = θ₁·s + θ₂
+       a ~ N(μ, σ²)
+       k₁† = k₁⁰·a,   k₂† = k₂⁰/a
+
+    ② ENVIRONMENT responds (SSA step):
+       Run one SSA step with k₁†, k₂†
+       Get: reward r, new state s'
+
+    ③ CRITIC computes TD error:
+       δ = r + γ·V_w(s') - V_w(s)
+         = r + γ·(w₁·s' + w₂) - (w₁·s + w₂)
+
+    ④ CRITIC updates (reduce prediction error):
+       w₁ ← w₁ + α_w · δ · s
+       w₂ ← w₂ + α_w · δ · 1
+
+    ⑤ ACTOR updates (improve policy using critique):
+       θ₁ ← θ₁ + α_θ · δ · (a−μ)·s/σ²
+       θ₂ ← θ₂ + α_θ · δ · (a−μ)/σ²
+
+    ⑥ s ← s'

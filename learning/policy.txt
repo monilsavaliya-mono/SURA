@@ -1,0 +1,23 @@
+Step 1: Policy = parameterized function π_θ(a|s)
+        Gaussian: a ~ N(θ₁·nA + θ₂, σ²)
+
+Step 2: Objective = expected total reward J(θ)
+
+Step 3: Gradient ascent: θ ← θ + α∇J
+
+Step 4: Log trick to differentiate through expectation
+
+Step 5: Dynamics cancel → only policy log-prob matters
+
+Step 6: Policy gradient theorem
+        ∇J = E[∇log π_θ(a|s) · R]
+
+Step 7: Gaussian gradient
+        ∂logπ/∂θ₁ = (a−μ)·nA/σ²
+        ∂logπ/∂θ₂ = (a−μ)/σ²
+
+Step 8: Concrete example with numbers
+
+Step 9: REINFORCE algorithm
+
+Step 10: What θ converges to = PRX analytical answer

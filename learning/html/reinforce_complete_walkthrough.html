@@ -1,0 +1,431 @@
+
+<h2 class="sr-only">Complete REINFORCE algorithm walkthrough — shows every step A through F with actual numbers for the Moran process</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.w{font-family:var(--font-sans);padding:.4rem 0}
+.steps{display:flex;gap:0;margin-bottom:10px;border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden}
+.step{flex:1;padding:7px 6px;text-align:center;font-size:9px;cursor:pointer;border-right:.5px solid var(--color-border-tertiary);transition:background .15s;color:var(--color-text-secondary);font-weight:500}
+.step:last-child{border-right:none}
+.step.active{background:var(--color-background-info);color:var(--color-text-info)}
+.step.done{background:var(--color-background-success);color:var(--color-text-success)}
+.step.ep-end{background:var(--color-background-warning);color:var(--color-text-warning)}
+.panel{background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:11px 13px;margin-bottom:10px;min-height:200px}
+.phead{font-size:11px;font-weight:500;color:var(--color-text-primary);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.tag{font-size:8px;padding:2px 7px;border-radius:10px}
+.tag.init{background:#eff6ff;color:#1e3a8a;border:.5px solid #93c5fd}
+.tag.collect{background:#f0faf5;color:#064e3b;border:.5px solid #6ee7b7}
+.tag.returns{background:#fdf4ff;color:#581c87;border:.5px solid #d8b4fe}
+.tag.grad{background:#fff7ed;color:#7c2d12;border:.5px solid #fdba74}
+.tag.update{background:#fef2f2;color:#7f1d1d;border:.5px solid #fca5a5}
+.tag.ep{background:#fefce8;color:#713f12;border:.5px solid #fde047}
+.eq{font-family:var(--font-mono);font-size:10px;background:var(--color-background-secondary);border-radius:5px;padding:4px 8px;margin:3px 0;display:block;line-height:1.9;color:var(--color-text-secondary)}
+.eq .hi{color:var(--color-text-primary);font-weight:500}
+.eq .pos{color:#059669;font-weight:500}
+.eq .neg{color:#dc2626;font-weight:500}
+.eq .theta{color:#7c3aed;font-weight:500}
+.eq .r{color:#d97706;font-weight:500}
+.eq .mu{color:#0369a1;font-weight:500}
+.eq .act{color:#db2777;font-weight:500}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:8px}
+.statcard{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:7px 10px;border:.5px solid var(--color-border-tertiary)}
+.sk{font-size:8px;color:var(--color-text-secondary);margin-bottom:2px}
+.sv{font-size:15px;font-weight:500;font-family:var(--font-mono);color:var(--color-text-primary)}
+.sv.theta{color:#7c3aed}
+.sv.pos{color:#059669}
+.sv.neg{color:#dc2626}
+.row{display:flex;gap:7px;margin-bottom:8px;align-items:center}
+.btn{font-size:11px;padding:5px 12px;cursor:pointer;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary)}
+.btn.go{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info)}
+.btn:disabled{opacity:.35;cursor:default}
+.tbl{width:100%;border-collapse:collapse;font-size:10px}
+.tbl th{padding:4px 7px;text-align:right;color:var(--color-text-secondary);border-bottom:.5px solid var(--color-border-tertiary);font-size:9px;font-weight:500}
+.tbl th:first-child,.tbl td:first-child{text-align:center}
+.tbl td{padding:3px 7px;text-align:right;font-family:var(--font-mono);border-bottom:.5px solid var(--color-border-tertiary);font-size:10px}
+.tbl tr.cur td{background:var(--color-background-info);color:var(--color-text-info)}
+.note{font-size:10px;color:var(--color-text-secondary);line-height:1.7;margin-bottom:6px}
+.bignum{font-size:22px;font-weight:500;font-family:var(--font-mono)}
+.arrow{font-size:18px;color:var(--color-text-secondary);margin:0 4px}
+canvas{display:block;width:100%}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.cbox{border-radius:var(--border-radius-md);padding:8px 10px;font-size:10px;border:.5px solid}
+.cbox.before{border-color:#d8b4fe;background:#fdf4ff}
+.cbox.after{border-color:#6ee7b7;background:#f0faf5}
+.chead{font-weight:500;font-size:9px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.chead.before{color:#581c87}
+.chead.after{color:#064e3b}
+</style>
+
+<div class="w">
+
+<div class="steps" id="step-bar">
+  <div class="step active" data-s="A">A<br>Init</div>
+  <div class="step" data-s="B">B<br>Collect</div>
+  <div class="step" data-s="C">C<br>Returns</div>
+  <div class="step" data-s="D">D<br>Gradient</div>
+  <div class="step" data-s="E">E<br>Update θ</div>
+  <div class="step" data-s="F">F<br>Repeat</div>
+</div>
+
+<div class="panel" id="panel"></div>
+
+<div class="g3">
+  <div class="statcard">
+    <p class="sk">θ₁ (policy slope)</p>
+    <p class="sv theta" id="sv-t1">0.0000</p>
+  </div>
+  <div class="statcard">
+    <p class="sk">θ₂ (policy intercept)</p>
+    <p class="sv theta" id="sv-t2">1.0000</p>
+  </div>
+  <div class="statcard">
+    <p class="sk">episode / total steps</p>
+    <p class="sv" id="sv-ep">0 / 0</p>
+  </div>
+</div>
+
+<div class="row">
+  <button class="btn go" id="btn-next">Next step ↗</button>
+  <button class="btn" id="btn-ep">Run full episode</button>
+  <button class="btn" id="btn-5ep">5 episodes</button>
+  <button class="btn" id="btn-rst">Reset</button>
+  <span style="font-size:10px;color:var(--color-text-secondary);margin-left:6px">N=<b>10</b> &nbsp; γ_Moran=<b>1.5</b> &nbsp; k₁⁰=<b>1.5</b> &nbsp; k₂⁰=<b>1.0</b> &nbsp; σ=<b>0.3</b> &nbsp; α=<b>0.003</b> &nbsp; γ_RL=<b>0.97</b></span>
+</div>
+
+<div style="background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:10px 13px;margin-bottom:10px">
+  <p style="font-size:9px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Policy curve μ(nA) = θ₁·nA + θ₂ after each update</p>
+  <canvas id="c-pol" height="100"></canvas>
+</div>
+
+</div>
+
+<script>
+const N=10, K10=1.5, K20=1.0, SIG=0.3, ALPHA=0.003, GAMMA=0.97;
+
+let th1=0, th2=1, episode=0, totalSteps=0;
+let curStep='A';
+let epData=null;
+let timer=null;
+
+let seed=42;
+function rng(){ seed=((1664525*seed)+1013904223)>>>0; return seed/4294967296; }
+function gaussSample(mu,sig){ const u1=Math.max(rng(),1e-10),u2=rng(); return mu+sig*Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2); }
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+
+const STEPS=['A','B','C','D','E','F'];
+
+function updateBar(){
+  document.querySelectorAll('.step').forEach(el=>{
+    const s=el.dataset.s;
+    el.className='step';
+    if(s===curStep) el.classList.add('active');
+    else if(STEPS.indexOf(s)<STEPS.indexOf(curStep)) el.classList.add('done');
+  });
+}
+
+function updateStats(){
+  document.getElementById('sv-t1').textContent=th1.toFixed(4);
+  document.getElementById('sv-t2').textContent=th2.toFixed(4);
+  document.getElementById('sv-ep').textContent=episode+' / '+totalSteps;
+}
+
+function drawPolicy(){
+  const canvas=document.getElementById('c-pol');
+  const W=canvas.parentElement.clientWidth-26||500;
+  canvas.width=W; canvas.height=100;
+  const ctx=canvas.getContext('2d');
+  const P={l:36,r:10,t:8,b:24};
+  const cW=W-P.l-P.r, cH=100-P.t-P.b;
+  const pts=Array.from({length:N-1},(_,i)=>({x:i+1,y:th1*(i+1)+th2}));
+  let minY=Math.min(...pts.map(p=>p.y),0.3),maxY=Math.max(...pts.map(p=>p.y),1.7);
+  const pad=(maxY-minY)*0.15||0.2; minY-=pad; maxY+=pad;
+  const tx=x=>P.l+(x-1)/(N-2)*cW;
+  const ty=y=>P.t+cH-(y-minY)/(maxY-minY)*cH;
+  ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=.5;
+  [0.5,1.0,1.5,2.0].forEach(v=>{
+    if(v<minY||v>maxY) return;
+    ctx.beginPath(); ctx.moveTo(P.l,ty(v)); ctx.lineTo(P.l+cW,ty(v)); ctx.stroke();
+    ctx.fillStyle='#9ca3af'; ctx.font='8px sans-serif'; ctx.textAlign='right';
+    ctx.fillText(v.toFixed(1),P.l-3,ty(v)+3);
+  });
+  ctx.strokeStyle='#9ca3af'; ctx.lineWidth=1; ctx.setLineDash([4,2]);
+  ctx.beginPath(); ctx.moveTo(P.l,ty(1)); ctx.lineTo(P.l+cW,ty(1)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#9ca3af'; ctx.font='8px sans-serif'; ctx.textAlign='left';
+  ctx.fillText('μ=1 (OFF)',P.l+3,ty(1)-3);
+  ctx.strokeStyle='#7c3aed'; ctx.lineWidth=2.2;
+  ctx.beginPath(); pts.forEach((p,i)=>{ const x=tx(p.x),y=ty(p.y); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); }); ctx.stroke();
+  ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=.5;
+  ctx.beginPath(); ctx.moveTo(P.l,P.t+cH); ctx.lineTo(P.l+cW,P.t+cH); ctx.stroke();
+  for(let x=1;x<N;x++){ ctx.fillStyle='#9ca3af'; ctx.font='8px sans-serif'; ctx.textAlign='center'; ctx.fillText(x,tx(x),P.t+cH+13); }
+  ctx.fillText('nA',P.l+cW/2,P.t+cH+22);
+  ctx.save(); ctx.translate(10,P.t+cH/2); ctx.rotate(-Math.PI/2); ctx.textAlign='center'; ctx.fillStyle='#9ca3af'; ctx.font='8px sans-serif'; ctx.fillText('μ(nA)',0,0); ctx.restore();
+}
+
+function collectEpisode(){
+  const traj=[];
+  let s=Math.floor(N/2);
+  let lim=300;
+  while(s>0&&s<N&&lim-->0){
+    const m=clamp(th1*s+th2,0.1,5);
+    const a=clamp(gaussSample(m,SIG),0.05,8);
+    const k1=K10*a, k2=K20/a;
+    const h=s*(N-s)/N;
+    const a1=k1*h, a2=k2*h, a0=a1+a2;
+    if(a0<1e-10) break;
+    const ns=rng()<a1/a0?s+1:s-1;
+    const r=(ns>0&&ns<N)?1:0;
+    traj.push({t:traj.length,s,m:+m.toFixed(4),a:+a.toFixed(4),k1:+k1.toFixed(4),k2:+k2.toFixed(4),ns,r});
+    s=ns;
+  }
+  // compute returns backwards
+  let R=0;
+  for(let i=traj.length-1;i>=0;i--){
+    R=traj[i].r+GAMMA*R;
+    traj[i].R=+R.toFixed(4);
+  }
+  // compute gradients
+  let g1=0,g2=0;
+  traj.forEach(d=>{
+    const gp1=(d.a-d.m)*d.s/(SIG*SIG);
+    const gp2=(d.a-d.m)/(SIG*SIG);
+    d.gp1=+gp1.toFixed(4);
+    d.gp2=+gp2.toFixed(4);
+    d.contrib1=+(gp1*d.R).toFixed(4);
+    d.contrib2=+(gp2*d.R).toFixed(4);
+    g1+=gp1*d.R;
+    g2+=gp2*d.R;
+  });
+  totalSteps+=traj.length;
+  return {traj,g1:+g1.toFixed(4),g2:+g2.toFixed(4)};
+}
+
+const panels={
+  A:()=>{
+    const p=document.getElementById('panel');
+    p.innerHTML=`
+      <p class="phead"><span class="tag init">Step A — Initialize</span> Set starting parameter values</p>
+      <p class="note">Before any training, we pick starting values for θ₁ and θ₂. These determine the starting policy. We choose θ₁=0, θ₂=1 so the policy starts flat at μ=1 (uncontrolled — no bias toward boost or suppress). This is a neutral starting point.</p>
+      <span class="eq">θ₁ = <span class="theta">0.0000</span>  →  slope of μ(nA). Zero means policy is flat (no preference based on nA)</span>
+      <span class="eq">θ₂ = <span class="theta">1.0000</span>  →  intercept. With θ₁=0, μ(nA) = 1.0 for all nA = uncontrolled</span>
+      <span class="eq">σ  = 0.3    →  fixed noise. Action = <span class="act">a ~ N(μ, 0.3²)</span>. Exploration comes from this randomness</span>
+      <span class="eq">α  = 0.003  →  learning rate. How big each parameter update step is</span>
+      <span class="eq">γ  = 0.97   →  discount factor. Future rewards worth 97% of present rewards per step</span>
+      <div class="compare" style="margin-top:8px">
+        <div class="cbox before">
+          <p class="chead before">Initial policy μ(nA)</p>
+          <span class="eq" style="margin:2px 0">nA=1 → μ=1.00 (no action)</span>
+          <span class="eq" style="margin:2px 0">nA=5 → μ=1.00 (no action)</span>
+          <span class="eq" style="margin:2px 0">nA=9 → μ=1.00 (no action)</span>
+          <p style="font-size:9px;color:#581c87;margin-top:4px">flat line — treats all states the same</p>
+        </div>
+        <div class="cbox after">
+          <p class="chead after">Target after training</p>
+          <span class="eq" style="margin:2px 0">nA=1 → μ>1 (boost A — endangered)</span>
+          <span class="eq" style="margin:2px 0">nA=5 → μ≈1 (OFF mode — balanced)</span>
+          <span class="eq" style="margin:2px 0">nA=9 → μ<1 (suppress A — dominant)</span>
+          <p style="font-size:9px;color:#064e3b;margin-top:4px">tilted line — θ₁<0, θ₂>1</p>
+        </div>
+      </div>
+      <p class="note" style="margin-top:8px">Training will push θ₁ negative and adjust θ₂ so the policy learns to suppress A when it dominates and boost A when it's endangered. Press "Next step" to collect an episode.</p>
+    `;
+  },
+
+  B:()=>{
+    if(!epData) epData=collectEpisode();
+    const {traj}=epData;
+    const p=document.getElementById('panel');
+    const rowsHtml=traj.slice(0,12).map((d,i)=>`
+      <tr>
+        <td>${d.t}</td>
+        <td>${d.s}</td>
+        <td class="mu">${d.m}</td>
+        <td class="act">${d.a}</td>
+        <td>${d.k1}</td>
+        <td>${d.k2}</td>
+        <td>${d.ns}</td>
+        <td class="${d.r>0?'pos':'neg'}">${d.r}</td>
+      </tr>`).join('')+(traj.length>12?`<tr><td colspan="8" style="text-align:center;color:var(--color-text-secondary);font-size:9px">... ${traj.length-12} more steps ...</td></tr>`:'');
+    p.innerHTML=`
+      <p class="phead"><span class="tag collect">Step B — Collect Episode</span> Run SSA with current policy, record everything</p>
+      <p class="note">Starting from nA=${Math.floor(N/2)}, at each step: (1) compute μ from current θ, (2) sample action a from Gaussian, (3) compute k†, (4) run SSA step, (5) observe reward. Collect all (s,a,r) until absorption. This episode had <b>${traj.length} steps</b>. Absorbed at nA=${traj[traj.length-1].ns} (${traj[traj.length-1].ns===0?'B wins':'A wins'}).</p>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <tr><th>t</th><th>s=nA</th><th style="color:#0369a1">μ=θ₁s+θ₂</th><th style="color:#db2777">a~N(μ,σ²)</th><th>k†₁=k₁⁰·a</th><th>k†₂=k₂⁰/a</th><th>s′</th><th>r</th></tr>
+        ${rowsHtml}
+      </table>
+      </div>
+      <span class="eq" style="margin-top:8px">At each step t: μₜ = <span class="theta">${th1.toFixed(4)}</span>·sₜ + <span class="theta">${th2.toFixed(4)}</span>  →  sample <span class="act">aₜ ~ N(μₜ, 0.09)</span>  →  k†₁=<span class="hi">1.5·aₜ</span>  k†₂=<span class="hi">1.0/aₜ</span></span>
+      <span class="eq">SSA: propensity h=s(N−s)/N. Fire A+B→2A with prob k†₁h/(k†₁h+k†₂h) = k†₁/(k†₁+k†₂)</span>
+      <span class="eq">reward r = <span class="pos">+1</span> if still alive, <span class="neg">0</span> if absorbed (s′=0 or s′=N)</span>
+    `;
+  },
+
+  C:()=>{
+    if(!epData) epData=collectEpisode();
+    const {traj}=epData;
+    const p=document.getElementById('panel');
+    const rowsHtml=traj.slice(0,10).map(d=>`
+      <tr>
+        <td>${d.t}</td>
+        <td>${d.r}</td>
+        <td class="${d.R>=0?'pos':'neg'}">${d.R}</td>
+        <td style="font-size:9px;color:var(--color-text-secondary)">= r${d.t}+γ·R${d.t+1}</td>
+      </tr>`).join('')+(traj.length>10?`<tr><td colspan="4" style="text-align:center;color:var(--color-text-secondary);font-size:9px">... ${traj.length-10} more ...</td></tr>`:'');
+    p.innerHTML=`
+      <p class="phead"><span class="tag returns">Step C — Compute Returns</span> Work backwards through the episode</p>
+      <p class="note">After collecting the episode, compute Rₜ = total discounted reward from step t onward. Work <b>backwards</b>: start at the last step (R=0 after absorption), then Rₜ = rₜ + γ·Rₜ₊₁. Earlier steps have higher R because they have more future steps ahead.</p>
+      <span class="eq">R_T = r_T = ${traj[traj.length-1].r} &nbsp;(last step — <span class="${traj[traj.length-1].r>0?'pos':'neg'}">${traj[traj.length-1].r>0?'alive':'absorbed'}</span>)</span>
+      <span class="eq">R_{T-1} = r_{T-1} + γ·R_T = ${traj[traj.length-2]?.r||0} + 0.97·${traj[traj.length-1].R} = <span class="r">${traj[traj.length-2]?.R||0}</span></span>
+      <span class="eq">R_0 = <span class="r">${traj[0].R}</span> &nbsp;← first step has highest R (all future rewards included)</span>
+      <p class="note" style="margin-top:6px">Why discount γ=0.97? Immediate rewards are more certain than distant ones. Also prevents R from growing unboundedly in long episodes.</p>
+      <div style="overflow-x:auto;margin-top:6px">
+      <table class="tbl">
+        <tr><th>t</th><th>rₜ</th><th style="color:#d97706">Rₜ</th><th>formula</th></tr>
+        ${rowsHtml}
+      </table>
+      </div>
+      <span class="eq" style="margin-top:6px">Key: step t=0 has R=<span class="r">${traj[0].R}</span> — it "sees" rewards from all ${traj.length} steps ahead (discounted). Step t=${traj.length-1} has R=${traj[traj.length-1].R} — nothing ahead.</span>
+    `;
+  },
+
+  D:()=>{
+    if(!epData) epData=collectEpisode();
+    const {traj,g1,g2}=epData;
+    const p=document.getElementById('panel');
+    const ex=traj[0];
+    const rowsHtml=traj.slice(0,8).map(d=>`
+      <tr>
+        <td>${d.t}</td>
+        <td>${d.s}</td>
+        <td>${d.a}</td>
+        <td>${d.m}</td>
+        <td class="${d.gp1>=0?'pos':'neg'}">${d.gp1}</td>
+        <td class="${d.gp2>=0?'pos':'neg'}">${d.gp2}</td>
+        <td>${d.R}</td>
+        <td class="${d.contrib1>=0?'pos':'neg'}">${d.contrib1}</td>
+        <td class="${d.contrib2>=0?'pos':'neg'}">${d.contrib2}</td>
+      </tr>`).join('')+(traj.length>8?`<tr><td colspan="9" style="text-align:center;color:var(--color-text-secondary);font-size:9px">... ${traj.length-8} more ...</td></tr>`:'');
+    p.innerHTML=`
+      <p class="phead"><span class="tag grad">Step D — Compute Gradient</span> How should θ change to improve policy?</p>
+      <p class="note">For each step t, compute how much changing θ would make action aₜ more/less likely, weighted by how good that step's return Rₜ was. Sum across all steps.</p>
+      <span class="eq">∂logπ/∂θ₁ = (aₜ − μₜ)·sₜ / σ² &nbsp;&nbsp; ∂logπ/∂θ₂ = (aₜ − μₜ) / σ²</span>
+      <span class="eq" style="margin-bottom:6px">Example step t=0: (a−μ)=(${ex.a}−${ex.m})=${+(ex.a-ex.m).toFixed(4)}  σ²=0.09  s=${ex.s}</span>
+      <span class="eq">∂logπ/∂θ₁ = ${+(ex.a-ex.m).toFixed(4)}·${ex.s}/0.09 = <span class="${ex.gp1>=0?'pos':'neg'}">${ex.gp1}</span></span>
+      <span class="eq">∂logπ/∂θ₂ = ${+(ex.a-ex.m).toFixed(4)}/0.09 = <span class="${ex.gp2>=0?'pos':'neg'}">${ex.gp2}</span></span>
+      <span class="eq">Contribution to g₁ at t=0: ∂logπ/∂θ₁ · R₀ = ${ex.gp1} · ${ex.R} = <span class="${ex.contrib1>=0?'pos':'neg'}">${ex.contrib1}</span></span>
+      <div style="overflow-x:auto;margin:6px 0">
+      <table class="tbl">
+        <tr><th>t</th><th>s</th><th style="color:#db2777">a</th><th style="color:#0369a1">μ</th><th>∂logπ/∂θ₁</th><th>∂logπ/∂θ₂</th><th>Rₜ</th><th>contrib θ₁</th><th>contrib θ₂</th></tr>
+        ${rowsHtml}
+      </table>
+      </div>
+      <span class="eq">g₁ = Σₜ contrib_θ₁ = <span class="${g1>=0?'pos':'neg'}">${g1}</span> &nbsp;&nbsp; g₂ = Σₜ contrib_θ₂ = <span class="${g2>=0?'pos':'neg'}">${g2}</span></span>
+      <p class="note" style="margin-top:5px">g₁<0 means: on balance, this episode suggests θ₁ should decrease (more negative slope → suppress A more at high nA). g₁>0 means increase θ₁.</p>
+    `;
+  },
+
+  E:()=>{
+    if(!epData) epData=collectEpisode();
+    const {g1,g2}=epData;
+    const old1=th1, old2=th2;
+    th1=+(th1+ALPHA*g1).toFixed(4);
+    th2=+(th2+ALPHA*g2).toFixed(4);
+    episode++;
+    updateStats();
+    drawPolicy();
+    const p=document.getElementById('panel');
+    p.innerHTML=`
+      <p class="phead"><span class="tag update">Step E — Update θ</span> Apply gradient ascent — THIS is where learning happens</p>
+      <p class="note">Use the gradient computed in Step D to update θ. This is gradient <b>ascent</b> (+ not −) because we want to maximize reward, not minimize loss.</p>
+      <span class="eq">θ₁ ← θ₁ + α·g₁ = <span class="theta">${old1.toFixed(4)}</span> + 0.003·<span class="${g1>=0?'pos':'neg'}">${g1}</span> = <span class="theta">${th1.toFixed(4)}</span></span>
+      <span class="eq">θ₂ ← θ₂ + α·g₂ = <span class="theta">${old2.toFixed(4)}</span> + 0.003·<span class="${g2>=0?'pos':'neg'}">${g2}</span> = <span class="theta">${th2.toFixed(4)}</span></span>
+      <div class="compare" style="margin-top:8px">
+        <div class="cbox before">
+          <p class="chead before">Before this episode</p>
+          <span class="eq">θ₁ = ${old1.toFixed(4)}</span>
+          <span class="eq">θ₂ = ${old2.toFixed(4)}</span>
+          <span class="eq">μ(5) = ${+(old1*5+old2).toFixed(4)}</span>
+          <span class="eq">μ(9) = ${+(old1*9+old2).toFixed(4)}</span>
+        </div>
+        <div class="cbox after">
+          <p class="chead after">After this episode</p>
+          <span class="eq">θ₁ = ${th1.toFixed(4)} ${th1<old1?'↓ (more negative)':'↑'}</span>
+          <span class="eq">θ₂ = ${th2.toFixed(4)}</span>
+          <span class="eq">μ(5) = ${+(th1*5+th2).toFixed(4)}</span>
+          <span class="eq">μ(9) = ${+(th1*9+th2).toFixed(4)}</span>
+        </div>
+      </div>
+      <p class="note" style="margin-top:8px"><b>Critical point:</b> θ is only updated ONCE per episode — after collecting the full trajectory and computing returns. This is REINFORCE. Actor-Critic updates after every single step (that's the main difference — more frequent but noisier... wait, less noisy because it uses δ not R). Look at the policy chart below — it should be tilting slightly.</p>
+      <span class="eq" style="margin-top:6px">After many episodes: θ₁→negative, θ₂→adjusted so μ(n★)≈1. Policy matches PRX k†/k⁰ curve.</span>
+    `;
+    epData=null;
+  },
+
+  F:()=>{
+    const p=document.getElementById('panel');
+    p.innerHTML=`
+      <p class="phead"><span class="tag ep">Step F — Repeat B→E</span> Run many episodes, keep improving</p>
+      <p class="note">After Step E, we have slightly better θ. Now collect a new episode with the new policy, compute new gradients, update again. Each episode the policy gets a little better. After many episodes θ converges.</p>
+      <span class="eq">Current θ₁ = <span class="theta">${th1.toFixed(4)}</span> &nbsp; θ₂ = <span class="theta">${th2.toFixed(4)}</span> &nbsp; (episode ${episode} done)</span>
+      <span class="eq">μ(nA=1) = ${+(th1*1+th2).toFixed(4)} ${th1*1+th2>1?'> 1 ✓ boosting A':'< 1 still learning...'}</span>
+      <span class="eq">μ(nA=5) = ${+(th1*5+th2).toFixed(4)} ${Math.abs(th1*5+th2-1)<0.2?'≈ 1 ✓ OFF mode':'still learning...'}</span>
+      <span class="eq">μ(nA=9) = ${+(th1*9+th2).toFixed(4)} ${th1*9+th2<1?'< 1 ✓ suppressing A':'> 1 still learning...'}</span>
+      <p class="note" style="margin-top:8px"><b>Why update only at episode end (not each step)?</b> REINFORCE needs the full return Rₜ which requires seeing the whole future — so you must wait for episode to finish. This is the variance problem: long episodes have noisy Rₜ estimates. Actor-Critic fixes this by using 1-step TD error δ instead (updates every step, much lower variance).</p>
+      <p class="note"><b>Convergence signal:</b> when θ₁ stabilizes around a negative value and μ(n★)≈1, training is done. The four numbers (θ₁,θ₂) encode the optimal dosing policy. Deploy by computing μ*(nA)=θ₁*·nA+θ₂* at each step — no more randomness, no more updates.</p>
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:8px 10px;margin-top:8px;font-size:10px;color:var(--color-text-secondary)">
+        Press "Run full episode" or "5 episodes" to keep training and watch θ₁ drift negative in the chart.
+      </div>
+    `;
+  }
+};
+
+function showPanel(s){
+  curStep=s;
+  updateBar();
+  panels[s]();
+  updateStats();
+  drawPolicy();
+}
+
+function nextStep(){
+  const idx=STEPS.indexOf(curStep);
+  if(curStep==='E'){
+    curStep='F';
+    showPanel('F');
+  } else if(curStep==='F'){
+    epData=null;
+    curStep='B';
+    showPanel('B');
+  } else {
+    showPanel(STEPS[idx+1]);
+  }
+}
+
+function runEpisode(){
+  epData=null;
+  showPanel('B');
+  showPanel('C');
+  showPanel('D');
+  showPanel('E');
+  showPanel('F');
+}
+
+document.getElementById('btn-next').onclick=nextStep;
+document.getElementById('btn-ep').onclick=runEpisode;
+document.getElementById('btn-5ep').onclick=()=>{
+  for(let i=0;i<5;i++){ epData=null; collectEpisode(); const ep2=collectEpisode(); const {g1,g2}=ep2; th1=+(th1+ALPHA*g1).toFixed(4); th2=+(th2+ALPHA*g2).toFixed(4); episode++; totalSteps+=ep2.traj.length; }
+  epData=null;
+  showPanel('F');
+};
+document.getElementById('btn-rst').onclick=()=>{
+  th1=0; th2=1; episode=0; totalSteps=0; epData=null; seed=42;
+  showPanel('A');
+};
+document.querySelectorAll('.step').forEach(el=>{
+  el.onclick=()=>{ if(el.dataset.s!==curStep) showPanel(el.dataset.s); };
+});
+
+showPanel('A');
+drawPolicy();
+</script>

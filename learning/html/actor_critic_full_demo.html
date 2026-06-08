@@ -1,0 +1,437 @@
+
+<h2 class="sr-only">Interactive Actor-Critic demo for Moran process — shows every step including SSA, policy, critic update and actor update with full math</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans)}
+.w{padding:.5rem 0}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+.card{background:var(--color-background-secondary);border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:10px 13px}
+.card.actor{border-color:#f72585;background:#fff0f7}
+.card.critic{border-color:#4361ee;background:#f0f3ff}
+.card.ssa{border-color:#1d9e75;background:#f0faf5}
+.card.step{border-color:var(--color-border-secondary)}
+.lbl{font-size:9px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;font-weight:500}
+.lbl.actor{color:#c0166a}
+.lbl.critic{color:#1a34b8}
+.lbl.ssa{color:#0f6e56}
+.big{font-size:20px;font-weight:500;font-family:var(--font-mono);color:var(--color-text-primary)}
+.med{font-size:14px;font-weight:500;font-family:var(--font-mono);color:var(--color-text-primary)}
+.sm{font-size:11px;color:var(--color-text-secondary);margin-top:2px}
+.eq{font-family:var(--font-mono);font-size:10px;background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);border-radius:5px;padding:4px 7px;margin:3px 0;display:block;color:var(--color-text-secondary)}
+.eq .hi{color:var(--color-text-primary);font-weight:500}
+.eq .pos{color:#1d9e75;font-weight:500}
+.eq .neg{color:#e74c3c;font-weight:500}
+.eq .act{color:#f72585;font-weight:500}
+.eq .crit{color:#4361ee;font-weight:500}
+.row{display:flex;gap:7px;margin-bottom:8px;align-items:center;flex-wrap:wrap}
+.btn{font-size:11px;padding:5px 12px;cursor:pointer;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary)}
+.btn:disabled{opacity:.35;cursor:default}
+.btn.go{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info)}
+.sr{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--color-text-secondary)}
+.sr input[type=range]{flex:1}
+.sr span{min-width:28px;font-family:var(--font-mono);font-size:10px}
+.log{background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:8px 10px;font-family:var(--font-mono);font-size:10px;height:110px;overflow-y:auto;line-height:1.9;color:var(--color-text-secondary)}
+.log .hi{color:var(--color-text-primary);font-weight:500}
+.log .pos{color:#1d9e75}
+.log .neg{color:#e74c3c}
+.log .act{color:#f72585}
+.log .crit{color:#4361ee}
+.log .ssa{color:#0f6e56}
+.pipe{display:flex;align-items:stretch;gap:0;margin-bottom:10px}
+.pbox{flex:1;background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);padding:8px 10px;font-size:10px;position:relative}
+.pbox:first-child{border-radius:var(--border-radius-md) 0 0 var(--border-radius-md)}
+.pbox:last-child{border-radius:0 var(--border-radius-md) var(--border-radius-md) 0}
+.parr{display:flex;align-items:center;font-size:16px;color:var(--color-text-secondary);padding:0 3px}
+.phead{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.pval{font-family:var(--font-mono);font-size:11px;color:var(--color-text-primary)}
+.step-active{border-color:#f72585!important;box-shadow:0 0 0 1.5px #f7258530}
+.tag{display:inline-block;font-size:8px;padding:1px 6px;border-radius:10px;margin-left:5px;vertical-align:middle}
+.tag.actor{background:#f7258520;color:#c0166a;border:.5px solid #f72585}
+.tag.critic{background:#4361ee20;color:#1a34b8;border:.5px solid #4361ee}
+.tag.ssa{background:#1d9e7520;color:#0f6e56;border:.5px solid #1d9e75}
+canvas{display:block;width:100%}
+.bar-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.bar-lbl{font-size:9px;color:var(--color-text-secondary);width:28px;flex-shrink:0;font-family:var(--font-mono)}
+.bar-bg{flex:1;background:var(--color-background-secondary);border-radius:3px;height:10px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .3s}
+.bar-val{font-size:9px;font-family:var(--font-mono);color:var(--color-text-secondary);width:38px;text-align:right}
+</style>
+
+<div class="w">
+
+<div class="g4">
+  <div class="card actor">
+    <p class="lbl actor">Actor θ₁ <span class="tag actor">policy slope</span></p>
+    <p class="big" id="v-t1">0.00</p>
+    <p class="sm">μ decreases as nA↑ when θ₁&lt;0</p>
+  </div>
+  <div class="card actor">
+    <p class="lbl actor">Actor θ₂ <span class="tag actor">policy intercept</span></p>
+    <p class="big" id="v-t2">1.00</p>
+    <p class="sm">baseline dose ratio</p>
+  </div>
+  <div class="card critic">
+    <p class="lbl critic">Critic w₁ <span class="tag critic">value slope</span></p>
+    <p class="big" id="v-w1">0.00</p>
+    <p class="sm">V(nA) = w₁·nA + w₂</p>
+  </div>
+  <div class="card critic">
+    <p class="lbl critic">Critic w₂ <span class="tag critic">value intercept</span></p>
+    <p class="big" id="v-w2">20.00</p>
+    <p class="sm">expected survival steps</p>
+  </div>
+</div>
+
+<div class="g3">
+  <div class="card ssa">
+    <p class="lbl ssa">Current state <span class="tag ssa">SSA</span></p>
+    <p class="big" id="v-state">—</p>
+    <p class="sm">nA (bacteria count)</p>
+  </div>
+  <div class="card">
+    <p class="lbl">μ (policy mean)</p>
+    <p class="big" id="v-mu">—</p>
+    <p class="sm">θ₁·nA + θ₂</p>
+  </div>
+  <div class="card">
+    <p class="lbl">Sampled action a</p>
+    <p class="big" id="v-a">—</p>
+    <p class="sm">a ~ N(μ, σ²), dose multiplier</p>
+  </div>
+</div>
+
+<div class="g3">
+  <div class="card ssa">
+    <p class="lbl ssa">k†₁ = k₁⁰·a <span class="tag ssa">SSA input</span></p>
+    <p class="big" id="v-k1">—</p>
+    <p class="sm">controlled rate (A wins)</p>
+  </div>
+  <div class="card ssa">
+    <p class="lbl ssa">k†₂ = k₂⁰/a <span class="tag ssa">SSA input</span></p>
+    <p class="big" id="v-k2">—</p>
+    <p class="sm">controlled rate (B wins)</p>
+  </div>
+  <div class="card">
+    <p class="lbl">New state s′ + reward r</p>
+    <p class="big" id="v-ns">—</p>
+    <p class="sm" id="v-r">r = +1 alive / 0 absorbed</p>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:10px">
+  <p class="lbl">Step-by-step math <span class="tag critic">critic</span><span class="tag actor">actor</span><span class="tag ssa">SSA</span></p>
+  <div id="math-box">
+    <span class="eq">Press "Step" to see full calculation here</span>
+  </div>
+</div>
+
+<div class="row">
+  <button class="btn go" id="btn-step">Step ↗</button>
+  <button class="btn" id="btn-10">10 steps</button>
+  <button class="btn" id="btn-ep">Episode</button>
+  <button class="btn" id="btn-100">100 episodes</button>
+  <button class="btn" id="btn-rst">Reset</button>
+  <label style="font-size:10px;color:var(--color-text-secondary)"><input type="checkbox" id="chk-slow"> slow</label>
+  <span style="font-size:10px;color:var(--color-text-secondary);margin-left:4px">ep: <span id="v-ep">0</span> &nbsp; steps: <span id="v-steps">0</span></span>
+</div>
+
+<div class="row">
+  <div class="sr" style="flex:1"><span>N</span><input type="range" min="10" max="40" step="5" value="20" id="sl-N"><span id="vN">20</span></div>
+  <div class="sr" style="flex:1"><span>γ</span><input type="range" min="10" max="20" step="5" value="15" id="sl-g"><span id="vg">1.5</span></div>
+  <div class="sr" style="flex:1"><span>α_θ</span><input type="range" min="1" max="20" step="1" value="5" id="sl-at"><span id="vat">0.005</span></div>
+  <div class="sr" style="flex:1"><span>α_w</span><input type="range" min="1" max="20" step="1" value="10" id="sl-aw"><span id="vaw">0.010</span></div>
+</div>
+
+<div class="g2" style="margin-bottom:10px">
+  <div class="card">
+    <p class="lbl">Policy curve μ(nA) = θ₁·nA + θ₂ <span class="tag actor">actor</span></p>
+    <p class="sm" style="margin-bottom:5px">μ &gt; 1 = boost A &nbsp;|&nbsp; μ = 1 = OFF &nbsp;|&nbsp; μ &lt; 1 = suppress A</p>
+    <canvas id="c-pol" height="130"></canvas>
+  </div>
+  <div class="card">
+    <p class="lbl">Value function V(nA) = w₁·nA + w₂ <span class="tag critic">critic</span></p>
+    <p class="sm" style="margin-bottom:5px">higher V = better state (longer survival expected)</p>
+    <canvas id="c-val" height="130"></canvas>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:10px">
+  <p class="lbl">SSA trajectory (current episode)</p>
+  <canvas id="c-traj" height="90"></canvas>
+</div>
+
+<p class="lbl" style="margin-bottom:4px">step log</p>
+<div class="log" id="log"></div>
+
+</div>
+
+<script>
+const K10=1.0, K20=1.0;
+let N=20, GAMMA_M=1.5, ALPHAt=0.005, ALPHAw=0.010;
+const SIG=0.3, GAMMA_RL=0.97;
+let th1=0, th2=1, w1=0, w2=20;
+let state=Math.floor(N/2), episode=0, totalSteps=0, epSteps=0;
+let trajNa=[state], trajT=[0];
+let timer=null;
+
+function makeLCG(seed){ let s=seed>>>0; return ()=>{ s=((1664525*s)+1013904223)>>>0; return s/4294967296; }; }
+let rng=makeLCG(42);
+
+function gaussSample(mu,sig){ const u1=rng(),u2=rng(); return mu+sig*Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2); }
+
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+
+function readSliders(){
+  N=+document.getElementById('sl-N').value;
+  GAMMA_M=+document.getElementById('sl-g').value/10;
+  ALPHAt=+document.getElementById('sl-at').value/1000;
+  ALPHAw=+document.getElementById('sl-aw').value/1000;
+  document.getElementById('vN').textContent=N;
+  document.getElementById('vg').textContent=GAMMA_M.toFixed(1);
+  document.getElementById('vat').textContent=ALPHAt.toFixed(3);
+  document.getElementById('vaw').textContent=ALPHAw.toFixed(3);
+}
+
+function reset(){
+  clearInterval(timer);
+  readSliders();
+  th1=0; th2=1; w1=0; w2=20;
+  state=Math.floor(N/2); episode=0; totalSteps=0; epSteps=0;
+  trajNa=[state]; trajT=[0];
+  rng=makeLCG(42);
+  updateCards();
+  updateCharts();
+  document.getElementById('math-box').innerHTML='<span class="eq">Press "Step" to see full calculation here</span>';
+  document.getElementById('v-state').textContent=state;
+  document.getElementById('v-mu').textContent='—';
+  document.getElementById('v-a').textContent='—';
+  document.getElementById('v-k1').textContent='—';
+  document.getElementById('v-k2').textContent='—';
+  document.getElementById('v-ns').textContent='—';
+  document.getElementById('v-r').textContent='r = +1 alive / 0 absorbed';
+  document.getElementById('v-ep').textContent=0;
+  document.getElementById('v-steps').textContent=0;
+  logIt('Reset. N='+N+' γ='+GAMMA_M+' α_θ='+ALPHAt+' α_w='+ALPHAw, true);
+}
+
+function V(s){ return w1*s+w2; }
+function mu(s){ return th1*s+th2; }
+
+function doStep(){
+  const s=state;
+  const m=mu(s);
+  const a=clamp(gaussSample(m,SIG),0.1,5.0);
+  const k1=K10*a;
+  const k2=K20/a;
+  const h=s*(N-s)/N;
+  const a1=k1*h, a2=k2*h, a0=a1+a2;
+  let ns=s, r=0;
+  if(a0>1e-10){
+    const t=-Math.log(rng())/a0;
+    ns=rng()<a1/a0 ? s+1 : s-1;
+    r=(ns>0&&ns<N)?1:0;
+  }
+  const Vs=V(s), Vns=V(ns);
+  const delta=r+GAMMA_RL*Vns-Vs;
+  const gradLogPi_t1=(a-m)*s/(SIG*SIG);
+  const gradLogPi_t2=(a-m)/(SIG*SIG);
+
+  const old_w1=w1, old_w2=w2, old_t1=th1, old_t2=th2;
+  w1+=ALPHAw*delta*s;
+  w2+=ALPHAw*delta*1;
+  th1+=ALPHAt*delta*gradLogPi_t1;
+  th2+=ALPHAt*delta*gradLogPi_t2;
+
+  state=ns; totalSteps++; epSteps++;
+  trajNa.push(ns); trajT.push(epSteps);
+
+  showMath(s,a,m,k1,k2,ns,r,Vs,Vns,delta,gradLogPi_t1,gradLogPi_t2,
+           old_w1,old_w2,old_t1,old_t2);
+  updateCards();
+  updateCharts();
+
+  const absorbed=(ns===0||ns===N);
+  if(absorbed){
+    episode++;
+    state=Math.floor(N/2)+Math.floor(rng()*4)-2;
+    state=clamp(state,1,N-1);
+    epSteps=0; trajNa=[state]; trajT=[0];
+    logStep(s,a,m,k1,k2,ns,r,delta,true);
+  } else {
+    logStep(s,a,m,k1,k2,ns,r,delta,false);
+  }
+  document.getElementById('v-ep').textContent=episode;
+  document.getElementById('v-steps').textContent=totalSteps;
+  return absorbed;
+}
+
+function showMath(s,a,m,k1,k2,ns,r,Vs,Vns,delta,gp1,gp2,ow1,ow2,ot1,ot2){
+  const sign=v=>v>=0?'+'+v.toFixed(4):v.toFixed(4);
+  const pos=v=>`<span class="${v>=0?'pos':'neg'}">${v.toFixed(4)}</span>`;
+  const act=v=>`<span class="act">${v.toFixed(4)}</span>`;
+  const crit=v=>`<span class="crit">${v.toFixed(4)}</span>`;
+  const hi=v=>`<span class="hi">${v.toFixed(4)}</span>`;
+
+  document.getElementById('v-state').textContent=s;
+  document.getElementById('v-mu').textContent=m.toFixed(4);
+  document.getElementById('v-a').textContent=a.toFixed(4);
+  document.getElementById('v-k1').textContent=k1.toFixed(4);
+  document.getElementById('v-k2').textContent=k2.toFixed(4);
+  document.getElementById('v-ns').textContent=ns+(ns===0?' (B wins)':ns===N?' (A wins)':'');
+  document.getElementById('v-r').textContent='r = '+(r>0?'+1 (alive)':'0 (absorbed)');
+
+  document.getElementById('math-box').innerHTML=`
+    <span class="eq"><span class="ssa">── SSA step ──────────────────────────────────────────────────────</span></span>
+    <span class="eq">state s = <span class="hi">${s}</span> &nbsp;|&nbsp; h(s) = s·(N−s)/N = ${s}·${N-s}/${N} = ${hi(s*(N-s)/N)}</span>
+    <span class="eq">μ = θ₁·s + θ₂ = ${ot1.toFixed(4)}·${s} + ${ot2.toFixed(4)} = ${act(m)}</span>
+    <span class="eq">a ~ N(μ, σ²) → sampled a = ${act(a)} &nbsp;|&nbsp; σ = ${SIG}</span>
+    <span class="eq">k†₁ = k₁⁰·a = ${K10}·${a.toFixed(4)} = ${act(k1)} &nbsp;|&nbsp; k†₂ = k₂⁰/a = ${K20}/${a.toFixed(4)} = ${act(k2)}</span>
+    <span class="eq">a₁=k†₁·h=${k1.toFixed(3)}·${(s*(N-s)/N).toFixed(3)}=${(k1*s*(N-s)/N).toFixed(3)} &nbsp; a₂=k†₂·h=${k2.toFixed(3)}·${(s*(N-s)/N).toFixed(3)}=${(k2*s*(N-s)/N).toFixed(3)}</span>
+    <span class="eq">SSA fires → new state s′ = <span class="ssa">${ns}</span> &nbsp;|&nbsp; reward r = <span class="${r>0?'pos':'neg'}">${r}</span></span>
+    <span class="eq"><span class="crit">── Critic update ─────────────────────────────────────────────────</span></span>
+    <span class="eq">V(s=${s}) = w₁·s + w₂ = ${ow1.toFixed(4)}·${s} + ${ow2.toFixed(4)} = ${crit(Vs)}</span>
+    <span class="eq">V(s′=${ns}) = w₁·s′ + w₂ = ${ow1.toFixed(4)}·${ns} + ${ow2.toFixed(4)} = ${crit(Vns)}</span>
+    <span class="eq">δ = r + γ·V(s′) − V(s) = ${r} + ${GAMMA_RL}·${Vns.toFixed(4)} − ${Vs.toFixed(4)} = ${pos(delta)}</span>
+    <span class="eq">w₁ ← ${ow1.toFixed(4)} + α_w·δ·s = ${ow1.toFixed(4)} + ${ALPHAw}·${delta.toFixed(4)}·${s} = ${crit(w1)}</span>
+    <span class="eq">w₂ ← ${ow2.toFixed(4)} + α_w·δ·1 = ${ow2.toFixed(4)} + ${ALPHAw}·${delta.toFixed(4)} = ${crit(w2)}</span>
+    <span class="eq"><span class="act">── Actor update ──────────────────────────────────────────────────</span></span>
+    <span class="eq">∂logπ/∂θ₁ = (a−μ)·s/σ² = (${a.toFixed(4)}−${m.toFixed(4)})·${s}/${(SIG*SIG).toFixed(2)} = ${act(gp1)}</span>
+    <span class="eq">∂logπ/∂θ₂ = (a−μ)/σ²   = (${a.toFixed(4)}−${m.toFixed(4)})/${(SIG*SIG).toFixed(2)} = ${act(gp2)}</span>
+    <span class="eq">θ₁ ← ${ot1.toFixed(4)} + α_θ·δ·∂logπ/∂θ₁ = ${ot1.toFixed(4)} + ${ALPHAt}·${delta.toFixed(4)}·${gp1.toFixed(4)} = ${act(th1)}</span>
+    <span class="eq">θ₂ ← ${ot2.toFixed(4)} + α_θ·δ·∂logπ/∂θ₂ = ${ot2.toFixed(4)} + ${ALPHAt}·${delta.toFixed(4)}·${gp2.toFixed(4)} = ${act(th2)}</span>
+  `;
+}
+
+function logStep(s,a,m,k1,k2,ns,r,delta,done){
+  const msg=done
+    ? `s=<span class="hi">${s}</span> a=<span class="act">${a.toFixed(3)}</span> k†=[${k1.toFixed(2)},${k2.toFixed(2)}] → s′=<span class="${ns===0?'neg':'pos'}">${ns} ${ns===0?'B-win':ns===N?'A-win':''}</span> r=${r} δ=<span class="${delta>=0?'pos':'neg'}">${delta.toFixed(3)}</span> θ=[<span class="act">${th1.toFixed(3)},${th2.toFixed(3)}</span>] <b>ep${episode}</b>`
+    : `s=<span class="hi">${s}</span> a=<span class="act">${a.toFixed(3)}</span> μ=${m.toFixed(3)} → s′=${ns} r=${r} δ=<span class="${delta>=0?'pos':'neg'}">${delta.toFixed(3)}</span> θ₁=<span class="act">${th1.toFixed(3)}</span>`;
+  logIt(msg);
+}
+
+function logIt(msg,clear){
+  const el=document.getElementById('log');
+  if(clear) el.innerHTML='';
+  el.innerHTML+=`<div>${msg}</div>`;
+  el.scrollTop=el.scrollHeight;
+}
+
+function updateCards(){
+  document.getElementById('v-t1').textContent=th1.toFixed(4);
+  document.getElementById('v-t2').textContent=th2.toFixed(4);
+  document.getElementById('v-w1').textContent=w1.toFixed(4);
+  document.getElementById('v-w2').textContent=w2.toFixed(4);
+}
+
+function drawLine(canvasId,pts,color,refY,refLabel,yLabel,xLabel,curX){
+  const canvas=document.getElementById(canvasId);
+  const W=canvas.parentElement.clientWidth-26||300;
+  canvas.width=W; canvas.height=130;
+  const ctx=canvas.getContext('2d');
+  const P={l:38,r:8,t:8,b:24};
+  const cW=W-P.l-P.r, cH=130-P.t-P.b;
+  let minY=Infinity,maxY=-Infinity;
+  pts.forEach(p=>{ if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; });
+  if(refY!==undefined){ if(refY<minY)minY=refY; if(refY>maxY)maxY=refY; }
+  const pad=(maxY-minY)*0.15||0.5;
+  minY-=pad; maxY+=pad;
+  const tx=x=>P.l+(x-1)/(N-2)*cW;
+  const ty=y=>P.t+cH-(y-minY)/(maxY-minY)*cH;
+  ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=.5;
+  for(let i=0;i<=4;i++){
+    const y=minY+i*(maxY-minY)/4;
+    ctx.beginPath(); ctx.moveTo(P.l,ty(y)); ctx.lineTo(P.l+cW,ty(y)); ctx.stroke();
+    ctx.fillStyle='#9ca3af'; ctx.font='8px sans-serif'; ctx.textAlign='right';
+    ctx.fillText(y.toFixed(1),P.l-3,ty(y)+3);
+  }
+  if(refY!==undefined){
+    ctx.strokeStyle='#9ca3af'; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(P.l,ty(refY)); ctx.lineTo(P.l+cW,ty(refY)); ctx.stroke();
+    ctx.setLineDash([]);
+    if(refLabel){ ctx.fillStyle='#9ca3af'; ctx.font='8px sans-serif'; ctx.textAlign='left'; ctx.fillText(refLabel,P.l+2,ty(refY)-3); }
+  }
+  if(curX&&curX>=1&&curX<=N-1){
+    ctx.strokeStyle='#f72585'; ctx.lineWidth=1; ctx.setLineDash([3,2]);
+    ctx.beginPath(); ctx.moveTo(tx(curX),P.t); ctx.lineTo(tx(curX),P.t+cH); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.strokeStyle=color; ctx.lineWidth=2.2; ctx.setLineDash([]);
+  ctx.beginPath(); let first=true;
+  pts.forEach(p=>{ const x=tx(p.x),y=ty(p.y); if(!isFinite(x)||!isFinite(y))return; if(first){ctx.moveTo(x,y);first=false;}else ctx.lineTo(x,y); });
+  ctx.stroke();
+  ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=.5;
+  ctx.beginPath(); ctx.moveTo(P.l,P.t+cH); ctx.lineTo(P.l+cW,P.t+cH); ctx.stroke();
+  [1,Math.floor(N/4),Math.floor(N/2),Math.floor(3*N/4),N-1].forEach(x=>{
+    ctx.fillStyle='#9ca3af'; ctx.font='8px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(x,tx(x),P.t+cH+13);
+  });
+  ctx.fillText(xLabel||'nA',P.l+cW/2,P.t+cH+22);
+  ctx.save(); ctx.translate(10,P.t+cH/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.fillStyle='#9ca3af'; ctx.font='8px sans-serif';
+  ctx.fillText(yLabel||'',0,0); ctx.restore();
+}
+
+function drawTraj(){
+  const canvas=document.getElementById('c-traj');
+  const W=canvas.parentElement.clientWidth-26||300;
+  canvas.width=W; canvas.height=90;
+  const ctx=canvas.getContext('2d');
+  const P={l:30,r:8,t:6,b:20};
+  const cW=W-P.l-P.r, cH=90-P.t-P.b;
+  const T=Math.max(trajT[trajT.length-1],10);
+  const tx=t=>P.l+t/T*cW;
+  const ty=n=>P.t+cH-(n/N)*cH;
+  ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=.5;
+  [0,Math.floor(N/4),Math.floor(N/2),Math.floor(3*N/4),N].forEach(n=>{
+    ctx.beginPath(); ctx.moveTo(P.l,ty(n)); ctx.lineTo(P.l+cW,ty(n)); ctx.stroke();
+    ctx.fillStyle='#9ca3af'; ctx.font='8px sans-serif'; ctx.textAlign='right';
+    ctx.fillText(n,P.l-3,ty(n)+3);
+  });
+  ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=.5;
+  ctx.beginPath(); ctx.moveTo(P.l,P.t+cH); ctx.lineTo(P.l+cW,P.t+cH); ctx.stroke();
+  ctx.strokeStyle='#1d9e75'; ctx.lineWidth=1.8; ctx.setLineDash([]);
+  ctx.beginPath();
+  trajT.forEach((t,i)=>{ const x=tx(t),y=ty(trajNa[i]); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.stroke();
+  ctx.fillStyle='#f72585';
+  ctx.beginPath(); ctx.arc(tx(trajT[trajT.length-1]),ty(trajNa[trajNa.length-1]),4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#9ca3af'; ctx.font='8px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('step',P.l+cW/2,P.t+cH+14);
+  ctx.save(); ctx.translate(10,P.t+cH/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.fillText('nA',0,0); ctx.restore();
+}
+
+function updateCharts(){
+  const polPts=Array.from({length:N-1},(_,i)=>({ x:i+1, y:th1*(i+1)+th2 }));
+  drawLine('c-pol',polPts,'#f72585',1,'μ=1 (OFF)','μ(nA)','nA',state);
+  const valPts=Array.from({length:N-1},(_,i)=>({ x:i+1, y:w1*(i+1)+w2 }));
+  drawLine('c-val',valPts,'#4361ee',undefined,undefined,'V(nA)','nA',state);
+  drawTraj();
+}
+
+document.getElementById('btn-step').onclick=()=>doStep();
+document.getElementById('btn-10').onclick=()=>{ for(let i=0;i<10;i++) doStep(); };
+document.getElementById('btn-ep').onclick=()=>{
+  let done=false,lim=500;
+  while(!done&&lim-->0) done=doStep();
+};
+document.getElementById('btn-100').onclick=()=>{
+  clearInterval(timer);
+  const slow=document.getElementById('chk-slow').checked;
+  let ep=0;
+  if(slow){
+    timer=setInterval(()=>{
+      let done=false,lim=500; while(!done&&lim-->0) done=doStep();
+      if(++ep>=100) clearInterval(timer);
+    },120);
+  } else {
+    for(let e=0;e<100;e++){ let done=false,lim=500; while(!done&&lim-->0) done=doStep(); }
+  }
+};
+document.getElementById('btn-rst').onclick=reset;
+['sl-N','sl-g','sl-at','sl-aw'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{ readSliders(); reset(); }));
+
+reset();
+</script>

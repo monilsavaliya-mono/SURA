@@ -1,0 +1,297 @@
+
+<h2 class="sr-only">Interactive Q-learning demo on a bacterial population control problem</h2>
+
+<style>
+  .ql-wrap { font-family: var(--font-sans); padding: 0.5rem 0; }
+  .ql-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .ql-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 12px 14px; }
+  .ql-label { font-size: 10px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 6px; }
+  .ql-val { font-size: 18px; font-weight: 500; font-family: var(--font-mono); color: var(--color-text-primary); margin: 0; }
+  .ql-sub { font-size: 11px; color: var(--color-text-secondary); margin: 2px 0 0; }
+  .ql-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; flex-wrap: wrap; }
+  .ql-btn { font-size: 12px; padding: 5px 12px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); cursor: pointer; background: var(--color-background-primary); color: var(--color-text-primary); }
+  .ql-btn:disabled { opacity: .4; cursor: default; }
+  .ql-btn.primary { background: var(--color-background-info); color: var(--color-text-info); border-color: var(--color-border-info); }
+  .ql-log { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 12px; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-secondary); height: 130px; overflow-y: auto; line-height: 1.8; }
+  .ql-log span.hi { color: var(--color-text-primary); font-weight: 500; }
+  .ql-log span.good { color: var(--color-text-success); }
+  .ql-log span.bad { color: var(--color-text-danger); }
+  .ql-log span.act { color: var(--color-text-info); }
+  table.qtab { width: 100%; border-collapse: collapse; font-size: 11px; }
+  table.qtab th { font-weight: 500; font-size: 10px; color: var(--color-text-secondary); padding: 4px 6px; border-bottom: 0.5px solid var(--color-border-tertiary); text-align: center; }
+  table.qtab td { padding: 4px 6px; text-align: center; font-family: var(--font-mono); border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 11px; }
+  td.best { background: var(--color-background-success); color: var(--color-text-success); font-weight: 500; border-radius: 3px; }
+  td.state-cur { background: var(--color-background-info); }
+  .bar-wrap { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+  .bar-lbl { font-size: 10px; color: var(--color-text-secondary); width: 60px; flex-shrink: 0; }
+  .bar-bg { flex: 1; background: var(--color-background-secondary); border-radius: 3px; height: 12px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+  .bar-num { font-size: 10px; font-family: var(--font-mono); color: var(--color-text-secondary); width: 44px; text-align: right; }
+  .pill { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 100px; margin-left: 6px; }
+  .pill-explore { background: var(--color-background-warning); color: var(--color-text-warning); }
+  .pill-exploit { background: var(--color-background-success); color: var(--color-text-success); }
+  .slider-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--color-text-secondary); }
+  .slider-row input[type=range] { flex: 1; }
+  .slider-row span { min-width: 30px; font-family: var(--font-mono); }
+</style>
+
+<div class="ql-wrap">
+
+  <div class="ql-grid">
+    <div class="ql-card">
+      <p class="ql-label">current state</p>
+      <p class="ql-val" id="cur-state">n = 5</p>
+      <p class="ql-sub">bacterial population</p>
+    </div>
+    <div class="ql-card">
+      <p class="ql-label">last reward</p>
+      <p class="ql-val" id="cur-reward">—</p>
+      <p class="ql-sub" id="cur-rew-sub">—</p>
+    </div>
+    <div class="ql-card">
+      <p class="ql-label">action taken</p>
+      <p class="ql-val" id="cur-action">—</p>
+      <p class="ql-sub" id="cur-mode-pill">—</p>
+    </div>
+    <div class="ql-card">
+      <p class="ql-label">total episodes</p>
+      <p class="ql-val" id="cur-eps">0</p>
+      <p class="ql-sub">ε = <span id="eps-val">1.00</span> (explore rate)</p>
+    </div>
+  </div>
+
+  <div class="ql-row">
+    <button class="ql-btn primary" id="btn-step">Step ↗</button>
+    <button class="ql-btn" id="btn-10">10 steps</button>
+    <button class="ql-btn" id="btn-ep">Run episode</button>
+    <button class="ql-btn" id="btn-100ep">100 episodes</button>
+    <button class="ql-btn" id="btn-reset">Reset</button>
+    <label style="font-size:11px; color:var(--color-text-secondary); margin-left:4px;">
+      <input type="checkbox" id="chk-slow"> slow mode
+    </label>
+  </div>
+
+  <div class="ql-row" style="margin-bottom:14px;">
+    <div class="slider-row" style="flex:1;">
+      <span>α</span>
+      <input type="range" min="1" max="9" step="1" value="3" id="sl-alpha">
+      <span id="sl-alpha-v">0.3</span>
+    </div>
+    <div class="slider-row" style="flex:1;">
+      <span>γ</span>
+      <input type="range" min="5" max="9" step="1" value="9" id="sl-gamma">
+      <span id="sl-gamma-v">0.9</span>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+    <div>
+      <p class="ql-label" style="margin-bottom:8px;">Q-table (rows=state n, cols=action dose)</p>
+      <div id="qtable-wrap" style="overflow-x:auto;"></div>
+    </div>
+    <div>
+      <p class="ql-label" style="margin-bottom:8px;">best action per state (learned policy)</p>
+      <div id="policy-viz"></div>
+    </div>
+  </div>
+
+  <p class="ql-label" style="margin-bottom:6px;">step log</p>
+  <div class="ql-log" id="log"></div>
+
+</div>
+
+<script>
+const N_STATES = 11;
+const ACTIONS  = [0, 0.5, 1.5, 4.0];
+const ACT_LBL  = ["none (0)", "low (0.5)", "med (1.5)", "high (4.0)"];
+const BIRTH    = 0.8;
+const GOAL     = 0;
+const GAMMA_INIT = 0.9;
+const ALPHA_INIT = 0.3;
+
+let Q, state, episode, totalSteps, epsilon, alpha, gamma, runTimer;
+
+function initQ() {
+  Q = Array.from({length: N_STATES}, () => ACTIONS.map(() => 0));
+}
+
+function reset() {
+  clearInterval(runTimer);
+  initQ();
+  state    = 5;
+  episode  = 0;
+  totalSteps = 0;
+  epsilon  = 1.0;
+  alpha    = ALPHA_INIT;
+  gamma    = GAMMA_INIT;
+  renderAll();
+  log("Reset. Bacteria = <span class='hi'>5</span>. Q-table zeroed. Ready to learn!", true);
+}
+
+function reward(s) {
+  if (s === 0) return 100;
+  return -s;
+}
+
+function nextState(s, dose) {
+  const killProb = Math.min(dose / (dose + 1), 0.95);
+  let ns = s;
+  for (let i = 0; i < s; i++) {
+    if (Math.random() < killProb) ns--;
+  }
+  const births = Math.random() < BIRTH * Math.max(ns,0) / N_STATES ? 1 : 0;
+  ns = Math.min(N_STATES-1, ns + births);
+  return Math.max(0, ns);
+}
+
+function chooseAction(s) {
+  if (Math.random() < epsilon) {
+    return { a: Math.floor(Math.random() * ACTIONS.length), explore: true };
+  }
+  const qs = Q[s];
+  const best = qs.indexOf(Math.max(...qs));
+  return { a: best, explore: false };
+}
+
+function step() {
+  const {a, explore} = chooseAction(state);
+  const ns = nextState(state, ACTIONS[a]);
+  const r  = reward(ns);
+  const maxQ_ns = Math.max(...Q[ns]);
+  const oldQ = Q[state][a];
+  const target = r + gamma * maxQ_ns;
+  const tdErr  = target - oldQ;
+  Q[state][a]  = oldQ + alpha * tdErr;
+  const prevState = state;
+  state = ns;
+  totalSteps++;
+  if (ns === 0) {
+    epsilon = Math.max(0.05, epsilon * 0.99);
+    episode++;
+    state = Math.floor(Math.random() * (N_STATES-2)) + 1;
+    logStep(prevState, a, r, ns, oldQ, Q[prevState][a], tdErr, explore, true);
+  } else {
+    logStep(prevState, a, r, ns, oldQ, Q[prevState][a], tdErr, explore, false);
+  }
+  renderAll();
+  return ns;
+}
+
+function logStep(s, a, r, ns, oldQ, newQ, td, explore, done) {
+  const mode = explore
+    ? "<span class='pill pill-explore'>explore</span>"
+    : "<span class='pill pill-exploit'>exploit</span>";
+  const rSpan = r > 0 ? `<span class='good'>+${r}</span>` : `<span class='bad'>${r}</span>`;
+  const msg = done
+    ? `n=${s} → dose=<span class='act'>${ACT_LBL[a]}</span> → n′=<span class='good'>0 ✓ eradicated!</span> | r=${rSpan} | Q: ${oldQ.toFixed(2)}→<span class='hi'>${newQ.toFixed(2)}</span> | td=${td.toFixed(2)} ${mode}`
+    : `n=<span class='hi'>${s}</span> → dose=<span class='act'>${ACT_LBL[a]}</span> → n′=${ns} | r=${rSpan} | Q: ${oldQ.toFixed(2)}→<span class='hi'>${newQ.toFixed(2)}</span> | td=${td.toFixed(2)} ${mode}`;
+  log(msg);
+
+  document.getElementById('cur-state').textContent  = `n = ${ns}`;
+  document.getElementById('cur-reward').textContent = r > 0 ? `+${r}` : `${r}`;
+  document.getElementById('cur-reward').style.color = r > 0 ? 'var(--color-text-success)' : 'var(--color-text-danger)';
+  document.getElementById('cur-rew-sub').textContent = r === 100 ? 'eradication bonus!' : `penalty for ${ns} bacteria`;
+  document.getElementById('cur-action').textContent = ACT_LBL[a];
+  document.getElementById('cur-mode-pill').innerHTML = explore
+    ? "<span class='pill pill-explore'>explore (random)</span>"
+    : "<span class='pill pill-exploit'>exploit (best Q)</span>";
+  document.getElementById('cur-eps').textContent = episode;
+  document.getElementById('eps-val').textContent  = epsilon.toFixed(2);
+}
+
+function log(msg, clear) {
+  const el = document.getElementById('log');
+  if (clear) { el.innerHTML = ''; }
+  el.innerHTML += `<div>${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderAll() {
+  renderQTable();
+  renderPolicy();
+}
+
+function renderQTable() {
+  const rows = [];
+  rows.push('<table class="qtab"><tr><th>state n</th>' + ACT_LBL.map(l=>`<th>${l}</th>`).join('') + '</tr>');
+  for (let s = N_STATES-1; s >= 0; s--) {
+    const qs   = Q[s];
+    const maxQ = Math.max(...qs);
+    const isCur = s === state;
+    rows.push(`<tr>`);
+    rows.push(`<td ${isCur ? "class='state-cur'" : ""}><b>${s}</b>${isCur ? ' ←' : ''}</td>`);
+    qs.forEach((q,a) => {
+      const isBest = q === maxQ && maxQ !== 0;
+      rows.push(`<td class="${isBest ? 'best' : ''}">${q.toFixed(1)}</td>`);
+    });
+    rows.push('</tr>');
+  }
+  rows.push('</table>');
+  document.getElementById('qtable-wrap').innerHTML = rows.join('');
+}
+
+function renderPolicy() {
+  const bars = [];
+  const cols = ['#378ADD','#1D9E75','#BA7517','#A32D2D'];
+  for (let s = N_STATES-1; s >= 0; s--) {
+    const qs   = Q[s];
+    const maxQ = Math.max(...qs);
+    const bestA = qs.indexOf(maxQ);
+    const isCur = s === state;
+    const dose  = ACTIONS[bestA];
+    const pct   = maxQ <= 0 ? 0 : Math.min(100, (dose/4)*100);
+    bars.push(`
+      <div class="bar-wrap" style="${isCur ? 'background:var(--color-background-info);border-radius:4px;padding:2px 4px;' : ''}">
+        <span class="bar-lbl">n=${s}${isCur?' ←':''}</span>
+        <div class="bar-bg">
+          <div class="bar-fill" style="width:${pct}%;background:${cols[bestA]}"></div>
+        </div>
+        <span class="bar-num">${ACT_LBL[bestA].split(' ')[0]}</span>
+      </div>`);
+  }
+  document.getElementById('policy-viz').innerHTML = bars.join('');
+}
+
+document.getElementById('btn-step').onclick = () => step();
+
+document.getElementById('btn-10').onclick = () => {
+  for (let i=0;i<10;i++) step();
+};
+
+document.getElementById('btn-ep').onclick = () => {
+  let s = state, lim = 200;
+  while (s !== 0 && lim-- > 0) s = step();
+};
+
+document.getElementById('btn-100ep').onclick = () => {
+  clearInterval(runTimer);
+  let ep = 0;
+  const slow = document.getElementById('chk-slow').checked;
+  if (slow) {
+    runTimer = setInterval(() => {
+      let s = state, lim = 200;
+      while (s !== 0 && lim-- > 0) s = step();
+      ep++;
+      if (ep >= 100) clearInterval(runTimer);
+    }, 80);
+  } else {
+    for (let e=0;e<100;e++) {
+      let s = state, lim = 500;
+      while (s !== 0 && lim-- > 0) { step(); }
+    }
+  }
+};
+
+document.getElementById('btn-reset').onclick = reset;
+
+document.getElementById('sl-alpha').oninput = function() {
+  alpha = this.value / 10;
+  document.getElementById('sl-alpha-v').textContent = alpha.toFixed(1);
+};
+document.getElementById('sl-gamma').oninput = function() {
+  gamma = this.value / 10;
+  document.getElementById('sl-gamma-v').textContent = gamma.toFixed(1);
+};
+
+reset();
+</script>

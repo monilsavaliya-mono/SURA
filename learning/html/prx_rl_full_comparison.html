@@ -1,0 +1,557 @@
+
+<h2 class="sr-only">Full detailed comparison: PRX analytical optimal control vs Q-learning for Moran process</h2>
+<style>
+.w{font-family:var(--font-sans);padding:.3rem 0}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.fbox{border-radius:var(--border-radius-lg);padding:9px 12px;font-size:10px;line-height:1.9;border:.5px solid}
+.fbox.prx{border-color:#bfdbfe;background:#eff6ff}
+.fbox.rl{border-color:#fed7aa;background:#fff7ed}
+.fhead{font-weight:600;margin:0 0 3px;font-size:10px}
+.feq{font-family:var(--font-mono);font-size:9px;margin:1px 0;padding:2px 5px;border-radius:3px;color:#374151}
+.feq.key{font-weight:700;background:rgba(0,0,0,0.07)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.card{background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:10px 12px;border:.5px solid var(--color-border-tertiary)}
+.lbl{font-size:9px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.07em;margin:0 0 7px;font-weight:600}
+.sr{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--color-text-secondary);margin-bottom:5px}
+.sr input[type=range]{flex:1}
+.sr span{min-width:30px;font-family:var(--font-mono);font-size:10px}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:7px}
+.stat{background:var(--color-background-primary);border-radius:var(--border-radius-md);padding:3px 7px;border:.5px solid var(--color-border-tertiary)}
+.sk{font-size:8px;color:var(--color-text-secondary);margin:0;line-height:1.3}
+.sv{font-size:12px;font-weight:500;font-family:var(--font-mono);margin:0;color:var(--color-text-primary)}
+.btn{font-size:11px;padding:6px;cursor:pointer;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-info);background:var(--color-background-info);color:var(--color-text-info);width:100%;margin-bottom:6px}
+.btn:disabled{opacity:.4;cursor:default}
+.cs{background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:10px 12px;margin-bottom:8px}
+.ct{font-size:10px;font-weight:600;color:var(--color-text-primary);margin:0 0 2px}
+.cf{font-family:var(--font-mono);font-size:9px;color:var(--color-text-secondary);background:var(--color-background-secondary);padding:3px 7px;border-radius:3px;margin:0 0 5px;display:block}
+.leg{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;font-size:9px;color:var(--color-text-secondary)}
+.li{display:flex;align-items:center;gap:3px}
+.ll{width:20px;height:2px;display:inline-block}
+.ld{width:8px;height:8px;border-radius:50%;display:inline-block}
+canvas{display:block}
+.tbl{width:100%;border-collapse:collapse;font-size:9px}
+.tbl th{padding:3px 5px;text-align:right;color:var(--color-text-secondary);border-bottom:.5px solid var(--color-border-tertiary);font-size:8px;white-space:nowrap;font-weight:500}
+.tbl th:first-child,.tbl td:first-child{text-align:center}
+.tbl td{padding:2px 5px;text-align:right;border-bottom:.5px solid var(--color-border-tertiary);font-family:var(--font-mono);font-size:9px}
+.ag{color:var(--color-text-success);font-weight:700}
+.dg{color:var(--color-text-danger)}
+.offrow{background:rgba(107,114,128,0.06)}
+</style>
+
+<div class="w">
+
+<!-- FORMULA CARDS -->
+<div class="frow">
+  <div class="fbox prx">
+    <p class="fhead" style="color:#1e3a5f">🔵 PRX Analytical — Horiguchi & Kobayashi (2025)</p>
+    <div class="feq">Step 1 · Propensity: h(nA) = nA·(N−nA)/N</div>
+    <div class="feq">Step 2 · Solve tridiagonal system (Thomas O(N)):</div>
+    <div class="feq" style="padding-left:12px">[β−(k₁+k₂)·h]Z(nA) + k₁h·Z(nA+1) + k₂h·Z(nA−1) = 0</div>
+    <div class="feq" style="padding-left:12px">Boundary: Z(0) = Z(N) = exp(β·U_exit) = 1</div>
+    <div class="feq">Step 3 · Value function: V(nA) = log Z(nA)</div>
+    <div class="feq key">Step 4 · Optimal k†₁(nA) = k₁⁰ · Z(nA+1) / Z(nA)</div>
+    <div class="feq key">Step 4 · Optimal k†₂(nA) = k₂⁰ · Z(nA−1) / Z(nA)</div>
+  </div>
+  <div class="fbox rl">
+    <p class="fhead" style="color:#7c2d12">🟠 Q-Learning — Model-free RL</p>
+    <div class="feq">Step 1 · Actions: 7 discrete (k₁, k₂) multiplier pairs</div>
+    <div class="feq">Step 2 · Bellman update after each SSA step:</div>
+    <div class="feq" style="padding-left:12px">Q(s,a) ← Q(s,a) + α[r + γ·max_a'Q(s',a') − Q(s,a)]</div>
+    <div class="feq" style="padding-left:12px">r = +1 per step alive, 0 at absorption</div>
+    <div class="feq">Step 3 · Learned value: V*(nA) = max_a Q*(nA,a)</div>
+    <div class="feq key">Step 4 · Optimal k†₁_RL(nA) = k₁⁰ · m₁[argmax Q*(nA,·)]</div>
+    <div class="feq key">Step 4 · Optimal k†₂_RL(nA) = k₂⁰ · m₂[argmax Q*(nA,·)]</div>
+  </div>
+</div>
+
+<!-- CONTROLS + STATS -->
+<div class="g2">
+  <div class="card">
+    <p class="lbl">Parameters</p>
+    <div class="sr"><span>N</span><input type="range" min="10" max="70" step="5" value="30" id="sl-N"><span id="vN">30</span></div>
+    <div class="sr"><span>γ</span><input type="range" min="10" max="25" step="5" value="15" id="sl-g"><span id="vg">1.5</span></div>
+    <div class="sr"><span>k₂⁰</span><input type="range" min="5" max="20" step="5" value="10" id="sl-k2"><span id="vk2">1.0</span></div>
+    <div class="sr"><span>β/βc</span><input type="range" min="10" max="90" step="10" value="70" id="sl-bf"><span id="vbf">0.70</span></div>
+    <div class="sr"><span>eps</span><input type="range" min="200" max="2000" step="200" value="800" id="sl-ep"><span id="vep">800</span></div>
+    <button class="btn" id="btn-run">▶ Solve PRX + Train RL + Compare</button>
+    <div style="font-size:9px;color:var(--color-text-secondary);line-height:1.8;background:var(--color-background-secondary);padding:6px 8px;border-radius:var(--border-radius-md)">
+      <strong>RL action set — 7 choices of (m₁, m₂):</strong><br>
+      [0] m₁=0.2, m₂=3.0 → suppress A strongly<br>
+      [1] m₁=0.5, m₂=2.0 → suppress A ×2<br>
+      [2] m₁=0.75, m₂=1.3 → suppress A mild<br>
+      [3] m₁=1.0, m₂=1.0 → uncontrolled (OFF)<br>
+      [4] m₁=1.3, m₂=0.75 → boost A mild<br>
+      [5] m₁=2.0, m₂=0.5 → boost A ×2<br>
+      [6] m₁=3.0, m₂=0.2 → boost A strongly
+    </div>
+  </div>
+  <div class="card">
+    <p class="lbl">Computed Values</p>
+    <div class="sg">
+      <div class="stat"><p class="sk">k₁⁰ = γ·k₂⁰</p><p class="sv" id="s-k1">—</p></div>
+      <div class="stat"><p class="sk">k₂⁰ (baseline)</p><p class="sv" id="s-k2">—</p></div>
+      <div class="stat"><p class="sk">βc (critical)</p><p class="sv" id="s-bc">—</p></div>
+      <div class="stat"><p class="sk">β = bFrac·βc</p><p class="sv" id="s-b">—</p></div>
+      <div class="stat"><p class="sk">n★ (V peak)</p><p class="sv" id="s-ns">—</p></div>
+      <div class="stat"><p class="sk">OFF mode (|∇V|&lt;0.08)</p><p class="sv" id="s-off">—</p></div>
+      <div class="stat"><p class="sk">PRX k†₁ range</p><p class="sv" id="s-r1">—</p></div>
+      <div class="stat"><p class="sk">PRX k†₂ range</p><p class="sv" id="s-r2">—</p></div>
+      <div class="stat"><p class="sk">RL-PRX agree (k†₁ dir)</p><p class="sv" id="s-ag">—</p></div>
+      <div class="stat"><p class="sk">Status</p><p class="sv" id="s-st">ready</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- CHART 1: V(nA) -->
+<div class="cs">
+  <p class="ct">Chart 1 — Value Function V(nA)</p>
+  <code class="cf">PRX: V(nA) = log Z(nA)   |   RL: V*(nA) = max_a Q*(nA,a)  [RL normalized to PRX scale for shape comparison]</code>
+  <div class="leg">
+    <span class="li"><span class="ll" style="background:#4361ee"></span>V_PRX = log Z(nA) — exact</span>
+    <span class="li"><span class="ld" style="background:#fb8500"></span>V*_RL normalized — same shape expected</span>
+    <span class="li" style="color:#f72585">◆ n★ = peak of V</span>
+  </div>
+  <canvas id="c1"></canvas>
+</div>
+
+<!-- CHART 2: k†_1 -->
+<div class="cs">
+  <p class="ct">Chart 2 — Optimal Rate k†₁(nA) for reaction A+B→2A</p>
+  <code class="cf">PRX: k†₁ = k₁⁰ · Z(nA+1)/Z(nA)   |   RL: k†₁ = k₁⁰ · m₁[argmax Q*(nA,·)]   |   Gray line = k₁⁰ (uncontrolled)</code>
+  <div class="leg">
+    <span class="li"><span class="ll" style="background:#4361ee"></span>PRX k†₁(nA) — continuous optimal</span>
+    <span class="li"><span class="ld" style="background:#fb8500"></span>RL k†₁(nA) — discrete approximation</span>
+    <span class="li"><span class="ll" style="background:#9ca3af"></span>k₁⁰ baseline (uncontrolled)</span>
+  </div>
+  <canvas id="c2"></canvas>
+</div>
+
+<!-- CHART 3: k†_2 -->
+<div class="cs">
+  <p class="ct">Chart 3 — Optimal Rate k†₂(nA) for reaction A+B→2B</p>
+  <code class="cf">PRX: k†₂ = k₂⁰ · Z(nA−1)/Z(nA)   |   RL: k†₂ = k₂⁰ · m₂[argmax Q*(nA,·)]   |   Gray line = k₂⁰ (uncontrolled)</code>
+  <div class="leg">
+    <span class="li"><span class="ll" style="background:#7209b7"></span>PRX k†₂(nA) — continuous optimal</span>
+    <span class="li"><span class="ld" style="background:#d62828"></span>RL k†₂(nA) — discrete approximation</span>
+    <span class="li"><span class="ll" style="background:#9ca3af"></span>k₂⁰ baseline (uncontrolled)</span>
+  </div>
+  <canvas id="c3"></canvas>
+</div>
+
+<!-- TABLE -->
+<div class="cs" id="tbl-sec" style="display:none">
+  <p class="ct">Full State-by-State Data Table</p>
+  <code class="cf">All computed values per state. ✦ = OFF mode (|∇V|&lt;0.08, near n★). Agreement: both PRX and RL on same side of baseline.</code>
+  <div style="overflow:auto;max-height:320px">
+    <table class="tbl">
+      <thead><tr>
+        <th>nA</th>
+        <th>V_PRX<br>= log Z</th>
+        <th>V*_RL<br>(norm)</th>
+        <th>k†₁_PRX<br>= k₁⁰·Z⁺/Z</th>
+        <th>k†₁_RL<br>= k₁⁰·m₁</th>
+        <th>k†₂_PRX<br>= k₂⁰·Z⁻/Z</th>
+        <th>k†₂_RL<br>= k₂⁰·m₂</th>
+        <th>RL best<br>action</th>
+        <th>k†₁<br>agree?</th>
+        <th>k†₂<br>agree?</th>
+      </tr></thead>
+      <tbody id="tbl-body"></tbody>
+    </table>
+  </div>
+</div>
+
+</div>
+
+<script>
+/* ══════ MATH ══════════════════════════════════════════════════ */
+
+function solveZ(N,k1,k2,beta){
+  const n=N-1;
+  const lo=new Float64Array(n),di=new Float64Array(n),up=new Float64Array(n),rh=new Float64Array(n);
+  for(let i=0;i<n;i++){
+    const nA=i+1,h=nA*(N-nA)/N;
+    di[i]=beta-(k1+k2)*h;
+    if(i>0) lo[i]=k2*h; else rh[i]-=k2*h;
+    if(i<n-1) up[i]=k1*h; else rh[i]-=k1*h;
+  }
+  for(let i=1;i<n;i++){
+    if(Math.abs(di[i-1])<1e-300) return null;
+    const m=lo[i]/di[i-1];
+    di[i]-=m*up[i-1]; rh[i]-=m*rh[i-1];
+  }
+  if(Math.abs(di[n-1])<1e-300) return null;
+  lo[n-1]=rh[n-1]/di[n-1];
+  for(let i=n-2;i>=0;i--) lo[i]=(rh[i]-up[i]*lo[i+1])/di[i];
+  for(let i=0;i<n;i++) if(!isFinite(lo[i])||lo[i]<=0) return null;
+  const Z=new Float64Array(N+1);
+  Z[0]=1; Z[N]=1;
+  for(let i=0;i<n;i++) Z[i+1]=lo[i];
+  return Z;
+}
+
+function findBetaC(N,k1,k2){
+  let lo=0,hi=Math.max((k1+k2)*N/4,0.01);
+  while(hi<1e8&&solveZ(N,k1,k2,hi)!==null) hi*=2;
+  if(solveZ(N,k1,k2,1e-12)===null) return 1e-10;
+  for(let i=0;i<64;i++){
+    const mid=(lo+hi)/2;
+    if(solveZ(N,k1,k2,mid)!==null) lo=mid; else hi=mid;
+    if(hi-lo<1e-12) break;
+  }
+  return lo;
+}
+
+/* ══════ ACTIONS ═══════════════════════════════════════════════ */
+
+const ACTS=[
+  {m1:0.2, m2:3.0,  cat:"[0] suppress A ×3"},
+  {m1:0.5, m2:2.0,  cat:"[1] suppress A ×2"},
+  {m1:0.75,m2:1.3,  cat:"[2] suppress A"},
+  {m1:1.0, m2:1.0,  cat:"[3] uncontrolled"},
+  {m1:1.3, m2:0.75, cat:"[4] boost A"},
+  {m1:2.0, m2:0.5,  cat:"[5] boost A ×2"},
+  {m1:3.0, m2:0.2,  cat:"[6] boost A ×3"},
+];
+
+/* ══════ Q-LEARNING ════════════════════════════════════════════ */
+
+function makeLCG(seed){
+  let s=seed>>>0;
+  return ()=>{ s=((1664525*s)+1013904223)>>>0; return s/4294967296; };
+}
+
+function runQL(N,k1b,k2b,nEps){
+  const nA=ACTS.length;
+  const Q=Array.from({length:N+1},()=>new Float64Array(nA));
+  const rng=makeLCG(42);
+  const alpha=0.25, gam=0.97;
+  let eps=1.0;
+  for(let ep=0;ep<nEps;ep++){
+    let s=Math.floor(rng()*(N-1))+1, st=0;
+    while(s>0&&s<N&&st<N*25){
+      let a;
+      if(rng()<eps){ a=Math.floor(rng()*nA); }
+      else{ const qs=Q[s]; let b=0; for(let i=1;i<nA;i++) if(qs[i]>qs[b]) b=i; a=b; }
+      const k1=k1b*ACTS[a].m1, k2=k2b*ACTS[a].m2;
+      const h=s*(N-s)/N, a1=k1*h, a2=k2*h, a0=a1+a2;
+      if(a0<1e-15) break;
+      const ns=rng()<a1/a0?s+1:s-1;
+      const r=(ns===0||ns===N)?0:1;
+      const qn=Q[ns]; let mq=qn[0]; for(let i=1;i<nA;i++) if(qn[i]>mq) mq=qn[i];
+      Q[s][a]+=alpha*(r+gam*mq-Q[s][a]);
+      s=ns; st++;
+    }
+    eps=Math.max(0.05,eps*0.993);
+  }
+  const pol=new Int32Array(N+1);
+  for(let s=0;s<=N;s++){ const qs=Q[s]; let b=0; for(let i=1;i<nA;i++) if(qs[i]>qs[b]) b=i; pol[s]=b; }
+  return {Q,pol};
+}
+
+/* ══════ COMPUTE PER-STATE DATA ════════════════════════════════ */
+
+function computePRX(N,k1,k2,Z){
+  const out=[];
+  for(let nA=1;nA<N;nA++){
+    const Zn=Math.max(Z[nA],1e-300);
+    const V=Math.log(Z[nA]);
+    const k1p=k1*Z[nA+1]/Zn;   // k†₁ = k₁⁰ · Z(nA+1)/Z(nA)
+    const k2p=k2*Z[nA-1]/Zn;   // k†₂ = k₂⁰ · Z(nA-1)/Z(nA)
+    const gV=Math.log(Z[nA+1]/Zn); // ∇V
+    out.push({nA,V,Z:Z[nA],k1p,k2p,gV});
+  }
+  return out;
+}
+
+function computeRL(N,k1,k2,Q,pol){
+  const out=[];
+  for(let nA=1;nA<N;nA++){
+    const a=pol[nA], act=ACTS[a];
+    const qs=Q[nA]; let Vrl=qs[0]; for(let i=1;i<ACTS.length;i++) if(qs[i]>Vrl) Vrl=qs[i];
+    out.push({nA,a,cat:act.cat,m1:act.m1,m2:act.m2,Vrl,k1r:k1*act.m1,k2r:k2*act.m2});
+  }
+  return out;
+}
+
+/* ══════ CANVAS DRAWING ════════════════════════════════════════ */
+
+function drawChart(canvasId,{yLabel,series,refY,refYLabel,yColor,nStar,xMin,xMax,h}){
+  const canvas=document.getElementById(canvasId);
+  const W=canvas.parentElement.clientWidth-24;
+  canvas.width=W; canvas.height=h||160;
+  canvas.style.width=W+'px';
+  const ctx=canvas.getContext('2d');
+  const P={l:52,r:16,t:10,b:28};
+  const cW=W-P.l-P.r, cH=(h||160)-P.t-P.b;
+
+  // Compute y range from all series data
+  let yMin=Infinity, yMax=-Infinity;
+  series.forEach(s=>{
+    if(!s||!s.pts) return;
+    s.pts.forEach(p=>{ if(isFinite(p.y)){if(p.y<yMin)yMin=p.y;if(p.y>yMax)yMax=p.y;} });
+  });
+  if(refY!==undefined){ if(refY<yMin)yMin=refY; if(refY>yMax)yMax=refY; }
+  const pad=(yMax-yMin)*0.12||0.1;
+  yMin-=pad; yMax+=pad;
+
+  const tx=x=>P.l+(x-xMin)/(xMax-xMin)*cW;
+  const ty=y=>P.t+cH-(y-yMin)/(yMax-yMin)*cH;
+
+  // Grid
+  ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=0.5;
+  const nTicks=5;
+  for(let i=0;i<=nTicks;i++){
+    const y=yMin+i*(yMax-yMin)/nTicks;
+    ctx.beginPath(); ctx.moveTo(P.l,ty(y)); ctx.lineTo(P.l+cW,ty(y)); ctx.stroke();
+    ctx.fillStyle='#6b7280'; ctx.font='8px sans-serif'; ctx.textAlign='right';
+    ctx.fillText(y.toFixed(2),P.l-4,ty(y)+3);
+  }
+
+  // Reference line (baseline k⁰)
+  if(refY!==undefined&&refY>=yMin&&refY<=yMax){
+    ctx.strokeStyle='#9ca3af'; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(P.l,ty(refY)); ctx.lineTo(P.l+cW,ty(refY)); ctx.stroke();
+    ctx.setLineDash([]);
+    if(refYLabel){
+      ctx.fillStyle='#6b7280'; ctx.font='8px sans-serif'; ctx.textAlign='left';
+      ctx.fillText(refYLabel,P.l+3,ty(refY)-3);
+    }
+  }
+
+  // n* vertical line
+  if(nStar&&nStar>=xMin&&nStar<=xMax){
+    ctx.strokeStyle='#f72585'; ctx.lineWidth=1.2; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(tx(nStar),P.t); ctx.lineTo(tx(nStar),P.t+cH); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#f72585'; ctx.font='8px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('n★='+nStar,tx(nStar),P.t+9);
+  }
+
+  // Draw series
+  series.forEach(s=>{
+    if(!s||!s.pts||!s.pts.length) return;
+    if(s.type==='line'){
+      ctx.strokeStyle=s.color||'#4361ee'; ctx.lineWidth=s.lw||2.2; ctx.setLineDash([]);
+      ctx.beginPath(); let first=true;
+      s.pts.forEach(p=>{
+        const x=tx(p.x),y=ty(p.y);
+        if(!isFinite(x)||!isFinite(y)) return;
+        if(first){ctx.moveTo(x,y);first=false;}else ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+    }
+    if(s.type==='dots'){
+      s.pts.forEach(p=>{
+        const x=tx(p.x),y=ty(p.y);
+        if(!isFinite(x)||!isFinite(y)) return;
+        ctx.fillStyle=s.color||'#fb8500';
+        ctx.beginPath(); ctx.arc(x,y,s.r||4,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.arc(x,y,s.r||4,0,Math.PI*2); ctx.stroke();
+      });
+    }
+  });
+
+  // X axis
+  ctx.strokeStyle='#6b7280'; ctx.lineWidth=0.5; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(P.l,P.t+cH); ctx.lineTo(P.l+cW,P.t+cH); ctx.stroke();
+  const step=Math.max(1,Math.floor((xMax-xMin)/8));
+  ctx.fillStyle='#6b7280'; ctx.font='8px sans-serif'; ctx.textAlign='center';
+  for(let x=Math.ceil(xMin/step)*step;x<=xMax;x+=step)
+    ctx.fillText(x,tx(x),P.t+cH+14);
+  ctx.fillText('nA',P.l+cW/2,P.t+cH+25);
+
+  // Y label
+  ctx.save(); ctx.translate(11,P.t+cH/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.fillStyle='#6b7280'; ctx.font='8px sans-serif';
+  ctx.fillText(yLabel||'',0,0); ctx.restore();
+}
+
+/* ══════ TABLE ═════════════════════════════════════════════════ */
+
+function buildTable(prx,rl,k1,k2){
+  // Normalize V_RL to PRX scale for display
+  const minVP=Math.min(...prx.map(d=>d.V)), maxVP=Math.max(...prx.map(d=>d.V));
+  const minVR=Math.min(...rl.map(d=>d.Vrl)), maxVR=Math.max(...rl.map(d=>d.Vrl));
+  const normV=v=> maxVR>minVR? minVP+(v-minVR)/(maxVR-minVR)*(maxVP-minVP) : minVP;
+
+  const tbody=document.getElementById('tbl-body');
+  tbody.innerHTML='';
+  prx.forEach((p,i)=>{
+    const r=rl[i];
+    const off=Math.abs(p.gV)<0.08;
+    // direction agreement
+    const pd1=p.k1p>k1*1.08?'up':p.k1p<k1*0.92?'dn':'fl';
+    const rd1=r.k1r>k1*1.08?'up':r.k1r<k1*0.92?'dn':'fl';
+    const pd2=p.k2p>k2*1.08?'up':p.k2p<k2*0.92?'dn':'fl';
+    const rd2=r.k2r>k2*1.08?'up':r.k2r<k2*0.92?'dn':'fl';
+    const ag1=pd1===rd1, ag2=pd2===rd2;
+    const tr=document.createElement('tr');
+    if(off) tr.className='offrow';
+    tr.innerHTML=
+      `<td>${p.nA}${off?' ✦':''}</td>`+
+      `<td>${p.V.toFixed(3)}</td>`+
+      `<td>${normV(r.Vrl).toFixed(3)}</td>`+
+      `<td style="color:#4361ee;font-weight:600">${p.k1p.toFixed(3)}</td>`+
+      `<td style="color:#fb8500;font-weight:600">${r.k1r.toFixed(3)}</td>`+
+      `<td style="color:#7209b7;font-weight:600">${p.k2p.toFixed(3)}</td>`+
+      `<td style="color:#d62828;font-weight:600">${r.k2r.toFixed(3)}</td>`+
+      `<td style="font-size:8px;color:var(--color-text-secondary)">${r.cat}</td>`+
+      `<td class="${ag1?'ag':'dg'}">${ag1?'✓':'✗'}</td>`+
+      `<td class="${ag2?'ag':'dg'}">${ag2?'✓':'✗'}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('tbl-sec').style.display='block';
+}
+
+/* ══════ SLIDERS ═══════════════════════════════════════════════ */
+
+let P={N:30,gamma:1.5,k2:1.0,bFrac:0.7,nEps:800};
+
+function readSliders(){
+  P.N    =+document.getElementById('sl-N').value;
+  P.gamma=+document.getElementById('sl-g').value/10;
+  P.k2   =+document.getElementById('sl-k2').value/10;
+  P.bFrac=+document.getElementById('sl-bf').value/100;
+  P.nEps =+document.getElementById('sl-ep').value;
+  document.getElementById('vN').textContent=P.N;
+  document.getElementById('vg').textContent=P.gamma.toFixed(1);
+  document.getElementById('vk2').textContent=P.k2.toFixed(1);
+  document.getElementById('vbf').textContent=P.bFrac.toFixed(2);
+  document.getElementById('vep').textContent=P.nEps;
+}
+
+['sl-N','sl-g','sl-k2','sl-bf','sl-ep'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',readSliders);
+});
+
+/* ══════ RENDER ALL CHARTS ═════════════════════════════════════ */
+
+function renderAll(prx,rl,k1,k2,N){
+  const xMin=1, xMax=N-1;
+  const nStar=prx.reduce((b,d)=>d.V>prx[b].V?prx.indexOf(d):b,0);
+  const nStarNA=prx[nStar].nA;
+
+  // Normalize V_RL
+  let rlNorm=null;
+  if(rl){
+    const minVR=Math.min(...rl.map(d=>d.Vrl)), maxVR=Math.max(...rl.map(d=>d.Vrl));
+    const minVP=Math.min(...prx.map(d=>d.V)), maxVP=Math.max(...prx.map(d=>d.V));
+    rlNorm=rl.map(d=>({
+      x:d.nA,
+      y:maxVR>minVR? minVP+(d.Vrl-minVR)/(maxVR-minVR)*(maxVP-minVP) : minVP,
+    }));
+  }
+
+  // Chart 1: V
+  drawChart('c1',{
+    yLabel:'V(nA)', h:165, xMin, xMax, nStar:nStarNA,
+    series:[
+      {type:'line',color:'#4361ee',lw:2.2,pts:prx.map(d=>({x:d.nA,y:d.V}))},
+      rlNorm?{type:'dots',color:'#fb8500',r:4,pts:rlNorm}:null,
+    ],
+  });
+
+  // Chart 2: k†_1
+  drawChart('c2',{
+    yLabel:'k†₁(nA)', h:165, xMin, xMax, nStar:nStarNA,
+    refY:k1, refYLabel:`k₁⁰=${k1.toFixed(2)} (uncontrolled)`,
+    series:[
+      {type:'line',color:'#4361ee',lw:2.2,pts:prx.map(d=>({x:d.nA,y:d.k1p}))},
+      rl?{type:'dots',color:'#fb8500',r:4.5,pts:rl.map(d=>({x:d.nA,y:d.k1r}))}:null,
+    ],
+  });
+
+  // Chart 3: k†_2
+  drawChart('c3',{
+    yLabel:'k†₂(nA)', h:165, xMin, xMax, nStar:nStarNA,
+    refY:k2, refYLabel:`k₂⁰=${k2.toFixed(2)} (uncontrolled)`,
+    series:[
+      {type:'line',color:'#7209b7',lw:2.2,pts:prx.map(d=>({x:d.nA,y:d.k2p}))},
+      rl?{type:'dots',color:'#d62828',r:4.5,pts:rl.map(d=>({x:d.nA,y:d.k2r}))}:null,
+    ],
+  });
+}
+
+/* ══════ STATS ═════════════════════════════════════════════════ */
+
+function updateStats(k1,k2,betaC,beta,prx,rl){
+  document.getElementById('s-k1').textContent=k1.toFixed(3);
+  document.getElementById('s-k2').textContent=k2.toFixed(3);
+  document.getElementById('s-bc').textContent=betaC.toFixed(5);
+  document.getElementById('s-b').textContent=beta.toFixed(5);
+  const ns=prx.reduce((b,d)=>d.V>prx[b].V?prx.indexOf(d):b,0);
+  document.getElementById('s-ns').textContent=prx[ns].nA;
+  const off=prx.filter(d=>Math.abs(d.gV)<0.08).length;
+  document.getElementById('s-off').textContent=`${off}/${prx.length}`;
+  const k1s=prx.map(d=>d.k1p), k2s=prx.map(d=>d.k2p);
+  document.getElementById('s-r1').textContent=`[${Math.min(...k1s).toFixed(2)}, ${Math.max(...k1s).toFixed(2)}]`;
+  document.getElementById('s-r2').textContent=`[${Math.min(...k2s).toFixed(2)}, ${Math.max(...k2s).toFixed(2)}]`;
+  if(rl){
+    let ag=0;
+    prx.forEach((p,i)=>{
+      const r=rl[i];
+      const pd=p.k1p>k1*1.08?'up':p.k1p<k1*0.92?'dn':'fl';
+      const rd=r.k1r>k1*1.08?'up':r.k1r<k1*0.92?'dn':'fl';
+      if(pd===rd) ag++;
+    });
+    const pct=Math.round(ag/prx.length*100);
+    const el=document.getElementById('s-ag');
+    el.textContent=`${pct}% (${ag}/${prx.length})`;
+    el.style.color=pct>70?'var(--color-text-success)':'var(--color-text-warning)';
+  }
+}
+
+/* ══════ MAIN RUN ══════════════════════════════════════════════ */
+
+document.getElementById('btn-run').addEventListener('click',function(){
+  readSliders();
+  const {N,gamma,k2,bFrac,nEps}=P;
+  const k1=gamma*k2;
+  const btn=this;
+  btn.disabled=true;
+  document.getElementById('s-st').textContent='solving PRX...';
+
+  setTimeout(()=>{
+    const betaC=findBetaC(N,k1,k2);
+    const beta=bFrac*betaC;
+    const Z=solveZ(N,k1,k2,beta);
+    if(!Z){
+      document.getElementById('s-st').textContent='β≥βc — invalid';
+      btn.disabled=false; btn.textContent='▶ Run';
+      return;
+    }
+    const prx=computePRX(N,k1,k2,Z);
+    updateStats(k1,k2,betaC,beta,prx,null);
+    renderAll(prx,null,k1,k2,N);
+    btn.textContent=`Training Q-learning (${nEps} eps)...`;
+    document.getElementById('s-st').textContent='training RL...';
+
+    setTimeout(()=>{
+      const {Q,pol}=runQL(N,k1,k2,nEps);
+      const rl=computeRL(N,k1,k2,Q,pol);
+      updateStats(k1,k2,betaC,beta,prx,rl);
+      renderAll(prx,rl,k1,k2,N);
+      buildTable(prx,rl,k1,k2);
+      btn.disabled=false;
+      btn.textContent='▶ Run Again';
+      document.getElementById('s-st').textContent='done ✓';
+    },20);
+  },20);
+});
+
+// Initial PRX-only render
+setTimeout(()=>{
+  readSliders();
+  const {N,gamma,k2,bFrac}=P;
+  const k1=gamma*k2;
+  const betaC=findBetaC(N,k1,k2);
+  const beta=bFrac*betaC;
+  const Z=solveZ(N,k1,k2,beta);
+  if(!Z) return;
+  const prx=computePRX(N,k1,k2,Z);
+  updateStats(k1,k2,betaC,beta,prx,null);
+  renderAll(prx,null,k1,k2,N);
+},120);
+</script>
