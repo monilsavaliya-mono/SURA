@@ -1,34 +1,3 @@
-"""
-Feynman-Kac Optimal Control — Meropenem / E. coli
-===================================================
-Two strategies for now: UNCONTROLLED vs OPTIMAL FK feedback.
-(Constant-dose and interval-optimal slot in later via the DOSING RULES
- section + the strategies dict — see the marked extension points.)
-
-TWO FIXES BUILT IN THIS VERSION
--------------------------------
-FIX 1 — Birth-coupled, stress-dependent mutation k5(c):
-   Mutations happen during DNA replication, tied to the S-BIRTH event,
-   NOT to standing population (Luria-Delbruck; lethal-mutagenesis arXiv
-   0903.1475: "mutations are coupled to duplication").
-   Sub-MIC beta-lactam stress raises per-division error rate 2-4x,
-   peaking at sub-MIC (Gutierrez 2013, Nat Commun 4:1610, RpoS/PolIV).
-     a_mut = k5_per_div * stress_factor(c) * (S birth propensity)
-   Only reaction-1 (S division) creates S->R resistance. R division
-   makes more R but no NEW resistance -> separate future reaction.
-
-FIX 2 — FK baseline includes reference drug c_base = micS:
-   With NO drug, S sits at ~756 forever, never reaches immune set, so V is
-   flat and the controller does nothing. Baseline death = k4 + alpha_S(micS)
-   (net S growth = 0) makes clearance reachable -> V gets a real gradient ->
-   optimal control is meaningful. Controller optimizes DEVIATION from c_base.
-
-OBJECTIVE (first-exit, both running terms):
-   U = U_exit(n_Texit) + integral U'(n) dt
-   U'(nS,nR) = -w_T - w_N*(nS+nR) - w_Rr*nR
-   U_exit    = -w_Rt*nR
-   absorbing: nS + nR <= N_immune  (immune clears; NOT (0,0))
-"""
 
 import numpy as np
 import matplotlib.pyplot as plt
